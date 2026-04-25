@@ -1,35 +1,33 @@
 import { redirect } from "next/navigation";
+import { getSession } from "@/lib/actions/auth.actions";
 import { createServerClient } from "@/lib/supabase/server";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TopBar } from "@/components/layout/TopBar";
 import { AlertaBanner } from "@/components/layout/AlertaBanner";
-
-const PAGE_TITLES: Record<string, { title: string; subtitle: string }> = {
-  "/dashboard":   { title: "Dashboard",    subtitle: "Resumen general del inventario" },
-  "/productos":   { title: "Productos",    subtitle: "Gestión de inventario y stock" },
-  "/proveedores": { title: "Proveedores",  subtitle: "Gestión de proveedores y contactos" },
-  "/compras":     { title: "Compras",      subtitle: "Órdenes de compra y facturas" },
-  "/salidas":     { title: "Salidas",      subtitle: "Consumo y merma de inventario" },
-  "/reportes":    { title: "Reportes",     subtitle: "Análisis y exportación de datos" },
-};
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
 }
 
 export default async function DashboardLayout({ children }: DashboardLayoutProps) {
-  const supabase = await createServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { user } = await getSession();
 
-  if (!user) redirect("/auth/login");
+  if (!user) redirect("/login");
 
-  // Get critical products for the alert banner
-  const { data: criticalProducts } = await supabase
-    .from("productos")
-    .select("id, nombre, stock_actual, stock_minimo")
-    .filter("stock_actual", "lt", "stock_minimo")
-    .order("nombre")
-    .limit(10);
+  // Get critical products for the alert banner (best-effort; ignore errors)
+  let criticalProducts: Array<{ id: string; nombre: string; stock_actual: number; stock_minimo: number }> | null = null;
+  try {
+    const supabase = await createServerClient();
+    const { data } = await supabase
+      .from("productos")
+      .select("id, nombre, stock_actual, stock_minimo")
+      .filter("stock_actual", "lt", "stock_minimo")
+      .order("nombre")
+      .limit(10);
+    criticalProducts = data;
+  } catch {
+    criticalProducts = null;
+  }
 
   // Default title (TopBar reads pathname client-side too)
   const defaultMeta = { title: "TequiStock", subtitle: "Control de Inventarios" };
@@ -54,7 +52,7 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
         <TopBar
           title={defaultMeta.title}
           subtitle={defaultMeta.subtitle}
-          userEmail={user.email}
+          userEmail={user.username}
         />
 
         {/* Page content */}

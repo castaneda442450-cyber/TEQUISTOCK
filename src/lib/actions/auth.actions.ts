@@ -1,10 +1,16 @@
 "use server";
 
-import { loginSchema, registerSchema } from "@/lib/schemas/auth.schema";
-import { createServerClient } from "@/lib/supabase/server";
+import { loginSchema } from "@/lib/schemas/auth.schema";
 import { checkRateLimit } from "@/lib/ratelimit";
-import { headers } from "next/headers";
+import { headers, cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { z } from "zod";
+
+// ─── Credenciales únicas autorizadas ─────────────────────────────────────────
+const AUTHORIZED_USER = "Carlos Nieto";
+const AUTHORIZED_PASSWORD = "TequilaMexicanStock";
+const SESSION_COOKIE = "tequistock_session";
+const SESSION_VALUE = "carlos_nieto_authenticated";
 
 export async function signIn(input: z.infer<typeof loginSchema>) {
   try {
@@ -21,63 +27,48 @@ export async function signIn(input: z.infer<typeof loginSchema>) {
       return { error: "Demasiados intentos. Intenta de nuevo en 15 minutos." };
     }
 
-    const supabase = await createServerClient();
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: parsed.data.email,
-      password: parsed.data.password,
-    });
+    // Validación estricta: solo Carlos Nieto + TequilaMexicanStock
+    const usernameOk = parsed.data.username.trim() === AUTHORIZED_USER;
+    const passwordOk = parsed.data.password === AUTHORIZED_PASSWORD;
 
-    if (error) {
-      return { error: "Correo o contraseña incorrectos" };
+    if (!usernameOk || !passwordOk) {
+      return { error: "Usuario o contraseña incorrectos" };
     }
 
-    return { data };
+    // Set secure session cookie
+    const cookieStore = await cookies();
+    cookieStore.set(SESSION_COOKIE, SESSION_VALUE, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 60 * 60 * 8, // 8 horas
+      path: "/",
+    });
+
+    return { data: { user: { username: AUTHORIZED_USER } } };
   } catch {
     return { error: "Error al iniciar sesión" };
   }
 }
 
-export async function signUp(input: z.infer<typeof registerSchema>) {
-  try {
-    const parsed = registerSchema.safeParse(input);
-    if (!parsed.success) {
-      return { error: "Datos inválidos", issues: parsed.error.flatten() };
-    }
-
-    const supabase = await createServerClient();
-    const { data, error } = await supabase.auth.signUp({
-      email: parsed.data.email,
-      password: parsed.data.password,
-    });
-
-    if (error) {
-      if (error.message.includes("already registered")) {
-        return { error: "Este correo ya está registrado" };
-      }
-      return { error: error.message };
-    }
-
-    return { data };
-  } catch {
-    return { error: "Error al crear la cuenta" };
-  }
-}
-
 export async function signOut() {
   try {
-    const supabase = await createServerClient();
-    await supabase.auth.signOut();
-    return { success: true };
+    const cookieStore = await cookies();
+    cookieStore.delete(SESSION_COOKIE);
   } catch {
-    return { error: "Error al cerrar sesión" };
+    // ignore
   }
+  redirect("/login");
 }
 
 export async function getSession() {
   try {
-    const supabase = await createServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    return { user };
+    const cookieStore = await cookies();
+    const session = cookieStore.get(SESSION_COOKIE);
+    if (session?.value === SESSION_VALUE) {
+      return { user: { username: AUTHORIZED_USER } };
+    }
+    return { user: null };
   } catch {
     return { user: null };
   }

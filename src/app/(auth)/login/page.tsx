@@ -4,106 +4,90 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Eye, EyeOff, Lock, Mail, UserPlus } from "lucide-react";
+import { Eye, EyeOff, Lock, User } from "lucide-react";
 import Image from "next/image";
 import { toast } from "sonner";
-import { signIn, signUp } from "@/lib/actions/auth.actions";
-import { loginSchema, registerSchema, type LoginInput, type RegisterInput } from "@/lib/schemas/auth.schema";
+import { signIn } from "@/lib/actions/auth.actions";
+import { loginSchema, type LoginInput } from "@/lib/schemas/auth.schema";
 
-// ── Componente reutilizable para campos de input ──────────────────────────────
-function InputField({
-  id,
-  label,
-  type,
-  placeholder,
-  icon: Icon,
-  error,
-  registration,
-  rightElement,
+// ─── Colores exactos del Cloud Design ────────────────────────────────────────
+const C = {
+  terracota:     "#BA3026",
+  terracotaDark: "#8F221A",
+  navy:          "#0B4455",
+  darkGreen:     "#0D4B43",
+  surface:       "#FFFFFF",
+  border:        "#E8E2DA",
+  textMain:      "#1C1714",
+  textSub:       "#7A7068",
+  textMuted:     "#B0A89E",
+};
+
+// ─── Input reutilizable ───────────────────────────────────────────────────────
+function Field({
+  id, label, type, placeholder, icon: Icon, error, reg, right,
 }: {
-  id: string;
-  label: string;
-  type: string;
-  placeholder: string;
-  icon: React.ElementType;
-  error?: string;
-  registration: object;
-  rightElement?: React.ReactNode;
+  id: string; label: string; type: string; placeholder: string;
+  icon: React.ElementType; error?: string; reg: object; right?: React.ReactNode;
 }) {
+  const [focused, setFocused] = useState(false);
+  const borderColor = error ? "#EF4444" : focused ? C.terracota : C.border;
+  const shadow = focused && !error ? `0 0 0 3px ${C.terracota}22` : "none";
+
   return (
-    <div className="mb-4">
-      <label
-        htmlFor={id}
-        className="block text-[12px] font-semibold mb-1.5"
-        style={{ color: "hsl(var(--text-sub))" }}
-      >
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: C.textSub, marginBottom: 5 }}>
         {label}
-      </label>
-      <div className="relative">
+      </div>
+      <div style={{ position: "relative" }}>
         <Icon
           size={15}
-          className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
-          style={{ color: "hsl(var(--text-muted))" }}
+          style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: C.textMuted, pointerEvents: "none" }}
         />
         <input
           id={id}
           type={type}
           placeholder={placeholder}
-          {...registration}
-          className="w-full rounded-lg border text-sm h-11 pl-9 pr-10 outline-none transition-all duration-150"
+          {...reg}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
           style={{
-            background: "hsl(var(--surface))",
-            color: "hsl(var(--text-main))",
-            borderColor: error ? "#EF4444" : "hsl(var(--border))",
-          }}
-          onFocus={(e) => {
-            e.currentTarget.style.borderColor = "hsl(var(--terracota))";
-            e.currentTarget.style.boxShadow = "0 0 0 3px hsl(var(--terracota) / 0.15)";
-          }}
-          onBlur={(e) => {
-            e.currentTarget.style.borderColor = error ? "#EF4444" : "hsl(var(--border))";
-            e.currentTarget.style.boxShadow = "";
+            width: "100%",
+            boxSizing: "border-box",
+            height: 42,
+            paddingLeft: 36,
+            paddingRight: right ? 40 : 12,
+            borderRadius: 8,
+            border: `1.5px solid ${borderColor}`,
+            boxShadow: shadow,
+            outline: "none",
+            fontSize: 14,
+            color: C.textMain,
+            background: C.surface,
+            transition: "border-color 0.15s, box-shadow 0.15s",
+            fontFamily: "inherit",
           }}
         />
-        {rightElement && (
-          <div className="absolute right-3 top-1/2 -translate-y-1/2">{rightElement}</div>
+        {right && (
+          <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)" }}>
+            {right}
+          </span>
         )}
       </div>
-      {error && <p className="mt-1 text-[11px] text-red-500">{error}</p>}
+      {error && <div style={{ fontSize: 11, color: "#EF4444", marginTop: 4 }}>{error}</div>}
     </div>
   );
 }
 
-// ── Botón de submit reutilizable ──────────────────────────────────────────────
-function SubmitButton({ loading, label, loadingLabel }: { loading: boolean; label: string; loadingLabel: string }) {
-  return (
-    <button
-      type="submit"
-      disabled={loading}
-      className="w-full h-12 rounded-lg text-white text-[14px] font-bold flex items-center justify-center gap-2 transition-all duration-150 mt-2"
-      style={{ background: "hsl(var(--terracota))", cursor: loading ? "wait" : "pointer", opacity: loading ? 0.85 : 1 }}
-      onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = "hsl(var(--terracota-dark))"; }}
-      onMouseLeave={(e) => { e.currentTarget.style.background = "hsl(var(--terracota))"; }}
-    >
-      {loading ? (
-        <>
-          <span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" style={{ animationDuration: "0.7s" }} />
-          {loadingLabel}
-        </>
-      ) : label}
-    </button>
-  );
-}
-
-// ── Formulario de Login ───────────────────────────────────────────────────────
-function LoginForm({ onSuccess }: { onSuccess: () => void }) {
+// ─── Formulario Login ─────────────────────────────────────────────────────────
+function LoginForm() {
+  const router = useRouter();
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
+  const [hover, setHover] = useState(false);
 
   const { register, handleSubmit, formState: { errors } } = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: "", password: "" },
   });
 
   const onSubmit = async (data: LoginInput) => {
@@ -125,193 +109,111 @@ function LoginForm({ onSuccess }: { onSuccess: () => void }) {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} noValidate>
-      <InputField
-        id="login-email"
-        label="Correo Electrónico"
-        type="email"
-        placeholder="correo@restaurante.mx"
-        icon={Mail}
-        error={errors.email?.message}
-        registration={register("email")}
-      />
-      <InputField
-        id="login-password"
-        label="Contraseña"
-        type={showPass ? "text" : "password"}
-        placeholder="••••••••"
-        icon={Lock}
-        error={errors.password?.message}
-        registration={register("password")}
-        rightElement={
-          <button
-            type="button"
-            onClick={() => setShowPass((p) => !p)}
-            className="hover:opacity-70 transition-opacity"
-            style={{ color: "hsl(var(--text-muted))" }}
-            aria-label={showPass ? "Ocultar contraseña" : "Mostrar contraseña"}
-          >
+      <Field id="username" label="Usuario" type="text"
+        placeholder="Tu usuario" icon={User}
+        error={errors.username?.message} reg={register("username")} />
+
+      <Field id="password" label="Contraseña" type={showPass ? "text" : "password"}
+        placeholder="••••••••" icon={Lock}
+        error={errors.password?.message} reg={register("password")}
+        right={
+          <button type="button" onClick={() => setShowPass(p => !p)}
+            style={{ background: "none", border: "none", cursor: "pointer", color: C.textMuted, display: "flex", padding: 0 }}>
             {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
           </button>
         }
       />
-      <SubmitButton loading={loading} label="Iniciar Sesión" loadingLabel="Iniciando sesión..." />
+
+      <div style={{ marginTop: 8 }}>
+        <button
+          type="submit"
+          disabled={loading}
+          onMouseEnter={() => setHover(true)}
+          onMouseLeave={() => setHover(false)}
+          style={{
+            width: "100%", height: 46, borderRadius: 8, border: "none",
+            background: hover && !loading ? C.terracotaDark : C.terracota,
+            color: "#fff", fontSize: 14, fontWeight: 700,
+            cursor: loading ? "wait" : "pointer", fontFamily: "inherit",
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+            transition: "background 0.15s",
+          }}
+        >
+          {loading ? (
+            <>
+              <span style={{
+                width: 16, height: 16, border: "2px solid rgba(255,255,255,0.3)",
+                borderTopColor: "#fff", borderRadius: "50%",
+                animation: "spin 0.7s linear infinite", display: "inline-block",
+              }} />
+              Iniciando sesión...
+            </>
+          ) : "Iniciar Sesión"}
+        </button>
+      </div>
     </form>
   );
 }
 
-// ── Formulario de Registro ────────────────────────────────────────────────────
-function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
-  const [showPass, setShowPass] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [loading, setLoading] = useState(false);
-
-  const { register, handleSubmit, formState: { errors } } = useForm<RegisterInput>({
-    resolver: zodResolver(registerSchema),
-    defaultValues: { email: "", password: "", confirmPassword: "" },
-  });
-
-  const onSubmit = async (data: RegisterInput) => {
-    setLoading(true);
-    try {
-      const result = await signUp(data);
-      if (result?.error) {
-        toast.error(result.error);
-      } else {
-        toast.success("¡Cuenta creada! Ya puedes iniciar sesión.");
-        onSuccess();
-      }
-    } catch {
-      toast.error("Error inesperado. Intenta nuevamente.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <form onSubmit={handleSubmit(onSubmit)} noValidate>
-      <InputField
-        id="reg-email"
-        label="Correo Electrónico"
-        type="email"
-        placeholder="correo@restaurante.mx"
-        icon={Mail}
-        error={errors.email?.message}
-        registration={register("email")}
-      />
-      <InputField
-        id="reg-password"
-        label="Contraseña"
-        type={showPass ? "text" : "password"}
-        placeholder="Mínimo 6 caracteres"
-        icon={Lock}
-        error={errors.password?.message}
-        registration={register("password")}
-        rightElement={
-          <button type="button" onClick={() => setShowPass((p) => !p)} className="hover:opacity-70 transition-opacity" style={{ color: "hsl(var(--text-muted))" }}>
-            {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
-          </button>
-        }
-      />
-      <InputField
-        id="reg-confirm"
-        label="Confirmar Contraseña"
-        type={showConfirm ? "text" : "password"}
-        placeholder="Repite tu contraseña"
-        icon={Lock}
-        error={errors.confirmPassword?.message}
-        registration={register("confirmPassword")}
-        rightElement={
-          <button type="button" onClick={() => setShowConfirm((p) => !p)} className="hover:opacity-70 transition-opacity" style={{ color: "hsl(var(--text-muted))" }}>
-            {showConfirm ? <EyeOff size={15} /> : <Eye size={15} />}
-          </button>
-        }
-      />
-      <SubmitButton loading={loading} label="Crear cuenta" loadingLabel="Creando cuenta..." />
-    </form>
-  );
-}
-
-// ── Página principal ──────────────────────────────────────────────────────────
+// ─── Página ───────────────────────────────────────────────────────────────────
 export default function LoginPage() {
-  const [mode, setMode] = useState<"login" | "register">("login");
-
   return (
-    <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
-      {/* Foto del restaurante como fondo */}
-      <Image
-        src="/imagenLogin.png"
-        alt="Tequila Mexican Restaurant"
-        fill
-        priority
-        className="object-cover object-center"
-        style={{ zIndex: 0 }}
-      />
-
-      {/* Overlay oscuro para legibilidad */}
-      <div
-        className="absolute inset-0"
-        style={{ background: "rgba(0,0,0,0.58)", zIndex: 1 }}
-      />
+    <div style={{
+      minHeight: "100vh",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundImage: "url('/imagenLogin.png')",
+      backgroundSize: "cover",
+      backgroundPosition: "center",
+      backgroundRepeat: "no-repeat",
+      position: "relative",
+      overflow: "hidden",
+    }}>
+      {/* Capa oscura sutil para mejorar contraste del card */}
+      <div style={{
+        position: "absolute",
+        inset: 0,
+        background: "linear-gradient(135deg, rgba(11,68,85,0.55) 0%, rgba(13,75,67,0.45) 50%, rgba(0,0,0,0.45) 100%)",
+        zIndex: 0,
+      }} />
 
       {/* Card */}
-      <div
-        className="relative w-full mx-4"
-        style={{
-          zIndex: 2,
-          maxWidth: 440,
-          background: "hsl(var(--surface))",
-          borderRadius: 16,
-          padding: "40px 40px 36px",
-          boxShadow: "0 32px 80px rgba(0,0,0,0.40)",
-        }}
-      >
-        {/* Logo + título */}
-        <div className="text-center mb-6">
+      <div style={{
+        background: C.surface,
+        borderRadius: 16,
+        padding: "44px 40px",
+        width: "100%",
+        maxWidth: 420,
+        margin: "0 16px",
+        boxShadow: "0 32px 80px rgba(0,0,0,0.28)",
+        position: "relative",
+        zIndex: 1,
+      }}>
+        {/* Logo */}
+        <div style={{ textAlign: "center", marginBottom: 28 }}>
           <Image
             src="/logo.png"
             alt="TequiStock"
-            width={72}
-            height={72}
-            className="rounded-xl mx-auto mb-3 object-cover"
+            width={80}
+            height={80}
+            style={{ borderRadius: 12, margin: "0 auto 12px", display: "block", objectFit: "cover" }}
           />
-          <div
-            className="text-[21px] font-extrabold tracking-widest uppercase"
-            style={{ color: "hsl(var(--text-main))" }}
-          >
+          <div style={{ fontSize: 22, fontWeight: 800, color: C.textMain, letterSpacing: 1 }}>
             TEQUISTOCK
           </div>
-          <div className="text-[12px] mt-0.5" style={{ color: "hsl(var(--text-sub))" }}>
+          <div style={{ fontSize: 13, color: C.textSub, marginTop: 4 }}>
             Control de Inventarios
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-2 mb-6 p-1 rounded-lg" style={{ background: "hsl(var(--surface-alt))" }}>
-          {(["login", "register"] as const).map((m) => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => setMode(m)}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-[13px] font-semibold transition-all duration-200"
-              style={{
-                background: mode === m ? "hsl(var(--terracota))" : "transparent",
-                color: mode === m ? "#fff" : "hsl(var(--text-sub))",
-                boxShadow: mode === m ? "0 2px 8px rgba(0,0,0,0.15)" : "none",
-              }}
-            >
-              {m === "register" && <UserPlus size={13} />}
-              {m === "login" ? "Iniciar Sesión" : "Registrarse"}
-            </button>
-          ))}
-        </div>
-
-        {/* Forms */}
-        {mode === "login" ? (
-          <LoginForm onSuccess={() => {}} />
-        ) : (
-          <RegisterForm onSuccess={() => setMode("login")} />
-        )}
+        {/* Formulario de Login (acceso restringido a un único usuario) */}
+        <LoginForm />
       </div>
+
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+      `}</style>
     </div>
   );
 }
