@@ -1,11 +1,13 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 
+const PROTECTED = ["/dashboard", "/productos", "/proveedores", "/compras", "/salidas", "/reportes"];
+
 export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
   let response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
+    request: { headers: request.headers },
   });
 
   const supabase = createServerClient(
@@ -13,9 +15,7 @@ export async function middleware(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
+        getAll() { return request.cookies.getAll(); },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options as CookieOptions)
@@ -25,31 +25,20 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // Refrescar sesión
-  await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const isProtected = PROTECTED.some((p) => pathname === p || pathname.startsWith(p + "/"));
 
-  const isAuthRoute = request.nextUrl.pathname.startsWith("/auth");
-  const isDashboardRoute = request.nextUrl.pathname.startsWith("/(dashboard)");
-
-  // Si no hay usuario y trata de acceder a dashboard → login
-  if (!user && isDashboardRoute) {
-    return NextResponse.redirect(new URL("/auth/login", request.url));
+  if (pathname === "/") {
+    return NextResponse.redirect(new URL(user ? "/dashboard" : "/login", request.url));
   }
 
-  // Si hay usuario y trata de acceder a login → dashboard
-  if (user && isAuthRoute) {
+  if (isProtected && !user) {
+    return NextResponse.redirect(new URL("/login", request.url));
+  }
+
+  if (pathname === "/login" && user) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
-  }
-
-  // Si trata de acceder a / → redirect a dashboard o login
-  if (request.nextUrl.pathname === "/") {
-    return NextResponse.redirect(
-      new URL(user ? "/dashboard" : "/auth/login", request.url)
-    );
   }
 
   return response;

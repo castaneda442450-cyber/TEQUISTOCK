@@ -1,14 +1,10 @@
-import { createServerClient as createSupabaseClient, type CookieOptions } from "@supabase/ssr";
+import { createServerClient as createSupabaseServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
-let cachedClient: any = null;
-
 export async function createServerClient() {
-  if (cachedClient) return cachedClient;
-
   const cookieStore = await cookies();
 
-  cachedClient = createSupabaseClient(
+  return createSupabaseServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
@@ -22,12 +18,10 @@ export async function createServerClient() {
               cookieStore.set(name, value, options as CookieOptions)
             );
           } catch {
-            // Ignorar en Server Components sin cookies
+            // Read-only context (Server Component) — ignore
           }
         },
       },
     }
   );
-
-  return cachedClient;
 }

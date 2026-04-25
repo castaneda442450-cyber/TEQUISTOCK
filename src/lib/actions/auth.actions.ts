@@ -28,7 +28,7 @@ export async function signIn(input: z.infer<typeof loginSchema>) {
     });
 
     if (error) {
-      return { error: "Email o contraseña inválidos" };
+      return { error: "Correo o contraseña incorrectos" };
     }
 
     return { data };
