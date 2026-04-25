@@ -1,0 +1,70 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Cloud Design Tokens - Light Mode */
+:root {
+  --terracota: 8 74% 58%;
+  --terracota-dark: 6 64% 48%;
+  --gold: 40 65% 58%;
+  --navy: 190 60% 33%;
+  --green: 154 60% 45%;
+  --dark-green: 165 75% 30%;
+  --bg: 30 50% 97%;
+  --surface: 0 0% 100%;
+  --surface-alt: 20 33% 96%;
+  --surface-hover: 15 29% 94%;
+  --border: 20 29% 91%;
+  --border-strong: 20 14% 82%;
+  --text-main: 15 27% 11%;
+  --text-sub: 26 17% 47%;
+  --text-muted: 20 11% 69%;
+  --nav-bg: 190 60% 33%;
+  --shadow: 0 0% 0% / 6%;
+  --shadow-md: 0 0% 0% / 10%;
+  --shadow-lg: 0 0% 0% / 18%;
+}
+
+/* Cloud Design Tokens - Dark Mode */
+.dark {
+  --terracota: 10 72% 61%;
+  --terracota-dark: 10 60% 50%;
+  --gold: 40 72% 63%;
+  --navy: 210 42% 50%;
+  --green: 170 54% 55%;
+  --dark-green: 170 60% 45%;
+  --bg: 220 13% 7%;
+  --surface: 220 13% 11%;
+  --surface-alt: 220 13% 14%;
+  --surface-hover: 220 12% 20%;
+  --border: 220 12% 18%;
+  --border-strong: 220 10% 27%;
+  --text-main: 220 13% 93%;
+  --text-sub: 220 12% 65%;
+  --text-muted: 220 10% 38%;
+  --nav-bg: 220 13% 7%;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: hsl(var(--bg));
+  color: hsl(var(--text-main));
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: hsl(var(--terracota));
+  box-shadow: 0 0 0 3px hsl(var(--terracota) / 0.2);
+}

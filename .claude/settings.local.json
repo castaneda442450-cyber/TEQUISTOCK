@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(/plugin marketplace *)",
+      "Read(//c/tmp/**)",
+      "Bash(cp -r c:/Users/PC/Documents/D1C4P/tequistock/.env.local c:/Users/PC/Documents/D1C4P/tequistock/CLAUDE.md c:/Users/PC/Documents/D1C4P/tequistock/imagenes .)",
+      "Bash(xargs rm *)",
+      "Bash(npx create-next-app@latest . --typescript --tailwind --app --src-dir --eslint --import-alias \"@/*\" --no-git)",
+      "Bash(cp /tmp/.env.local /tmp/CLAUDE.md c:/Users/PC/Documents/D1C4P/tequistock/)",
+      "Bash(cp -r /tmp/imagenes c:/Users/PC/Documents/D1C4P/tequistock/)",
+      "Bash(npm install *)",
+      "Bash(npx shadcn@latest init -d)",
+      "Bash(npx shadcn@latest add button input label select textarea dialog tabs table badge avatar dropdown-menu form sheet skeleton separator switch toast sonner alert checkbox -y)",
+      "Bash(npm run *)",
+      "Bash(git add *)",
+      "Bash(git init *)",
+      "Bash(git config *)",
+      "Bash(git commit -m 'feat: complete TequiStock setup with full stack configuration *)"
+    ]
+  }
+}
