@@ -25,7 +25,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" suppressHydrationWarning className={plusJakarta.variable}>
-      <body className="min-h-screen bg-bg text-text-main antialiased">
+      <body suppressHydrationWarning className="min-h-screen bg-bg text-text-main antialiased">
         <Providers>{children}</Providers>
         <Toaster richColors position="bottom-right" />
       </body>

@@ -1,6 +1,6 @@
 "use server";
 
-import { loginSchema } from "@/lib/schemas/auth.schema";
+import { loginSchema, registerSchema } from "@/lib/schemas/auth.schema";
 import { createServerClient } from "@/lib/supabase/server";
 import { checkRateLimit } from "@/lib/ratelimit";
 import { headers } from "next/headers";
@@ -18,7 +18,7 @@ export async function signIn(input: z.infer<typeof loginSchema>) {
 
     const rateLimit = await checkRateLimit(ip);
     if (!rateLimit.success) {
-      return { error: "Demasiados intentos. Intenta más tarde." };
+      return { error: "Demasiados intentos. Intenta de nuevo en 15 minutos." };
     }
 
     const supabase = await createServerClient();
@@ -32,9 +32,34 @@ export async function signIn(input: z.infer<typeof loginSchema>) {
     }
 
     return { data };
-  } catch (error) {
-    console.error("Sign in error:", error);
+  } catch {
     return { error: "Error al iniciar sesión" };
+  }
+}
+
+export async function signUp(input: z.infer<typeof registerSchema>) {
+  try {
+    const parsed = registerSchema.safeParse(input);
+    if (!parsed.success) {
+      return { error: "Datos inválidos", issues: parsed.error.flatten() };
+    }
+
+    const supabase = await createServerClient();
+    const { data, error } = await supabase.auth.signUp({
+      email: parsed.data.email,
+      password: parsed.data.password,
+    });
+
+    if (error) {
+      if (error.message.includes("already registered")) {
+        return { error: "Este correo ya está registrado" };
+      }
+      return { error: error.message };
+    }
+
+    return { data };
+  } catch {
+    return { error: "Error al crear la cuenta" };
   }
 }
 
@@ -43,8 +68,7 @@ export async function signOut() {
     const supabase = await createServerClient();
     await supabase.auth.signOut();
     return { success: true };
-  } catch (error) {
-    console.error("Sign out error:", error);
+  } catch {
     return { error: "Error al cerrar sesión" };
   }
 }
@@ -52,11 +76,9 @@ export async function signOut() {
 export async function getSession() {
   try {
     const supabase = await createServerClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const { data: { user } } = await supabase.auth.getUser();
     return { user };
-  } catch (error) {
+  } catch {
     return { user: null };
   }
 }
