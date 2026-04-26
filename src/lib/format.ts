@@ -1,5 +1,5 @@
 export function formatCurrency(n: number): string {
-  return n.toLocaleString("es-MX", {
+  return (n || 0).toLocaleString("es-MX", {
     style: "currency",
     currency: "MXN",
     minimumFractionDigits: 0,
@@ -21,11 +21,12 @@ export function formatTime(d: Date | string): string {
   return date.toLocaleTimeString("es-MX", {
     hour: "2-digit",
     minute: "2-digit",
+    hour12: true,
   });
 }
 
 export function formatNumber(n: number): string {
-  return n.toLocaleString("es-MX");
+  return (n || 0).toLocaleString("es-MX");
 }
 
 export type StockEstado = "critico" | "bajo" | "optimo";

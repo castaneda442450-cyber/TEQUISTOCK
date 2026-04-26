@@ -1,8 +1,194 @@
 "use server";
 
-// TODO: getDashboardData con filterMode (periodo, mes, dia)
-// Retorna: totalInventory, monthPurchases, monthMerma, criticalCount,
-// topProductos[5], topProveedores[5], topMermas[5],
-// spendingTrend[30 días], gastoPorCategoria[]
+import { createAdminClient } from "@/lib/supabase/admin";
+import { isMatchingWeekday, resolveDateRange } from "@/lib/dashboard/filters";
+import {
+  aggregateCriticalProducts,
+  aggregateGastoPorCategoria,
+  aggregateMetrics,
+  aggregateSpendingTrend,
+  aggregateTopMerma,
+  aggregateTopProductos,
+  aggregateTopProveedores,
+  buildProductLookup,
+  buildSupplierLookup,
+  type MermaRaw,
+  type OrdenRaw,
+  type ProductoRaw,
+  type ProveedorRaw,
+} from "@/lib/dashboard/aggregate";
+import type { DashboardData, DashboardFilters, FilterMeta } from "@/types";
 
-export const dashboardActionsReady = true;
+export async function getDashboardData(filters: DashboardFilters): Promise<DashboardData> {
+  const supabase = createAdminClient();
+  const range = resolveDateRange(filters);
+
+  // For 'dia' mode we cannot filter by weekday in SQL cleanly, so we fetch all
+  // orders/mermas and JS-filter. For 'periodo'/'mes' the [prevStart, end) window
+  // covers both current and prior periods in one query.
+  const isDia = filters.mode === "dia";
+
+  const productosQuery = supabase
+    .from("productos")
+    .select(
+      "id, nombre, unidad, stock_actual, stock_minimo, last_price, categoria_id, categorias!inner(nombre)",
+    );
+
+  const proveedoresQuery = supabase.from("proveedores").select("id, company");
+
+  const ordersQuery = isDia
+    ? supabase
+        .from("ordenes_compra")
+        .select("id, supplier_id, fecha, total, detalle_orden(product_id, qty, price)")
+    : supabase
+        .from("ordenes_compra")
+        .select("id, supplier_id, fecha, total, detalle_orden(product_id, qty, price)")
+        .gte("fecha", range.prevStart)
+        .lt("fecha", range.end);
+
+  const mermasQuery = isDia
+    ? supabase
+        .from("movimientos")
+        .select("id, product_id, fecha, qty, value_lost, motivo_merma")
+        .eq("tipo", "merma")
+    : supabase
+        .from("movimientos")
+        .select("id, product_id, fecha, qty, value_lost, motivo_merma")
+        .eq("tipo", "merma")
+        .gte("fecha", range.prevStart)
+        .lt("fecha", range.end);
+
+  const yearsQuery =
+    filters.mode === "mes"
+      ? supabase.from("ordenes_compra").select("fecha")
+      : Promise.resolve({ data: null, error: null });
+
+  const [productosRes, proveedoresRes, ordersRes, mermasRes, yearsRes] = await Promise.all([
+    productosQuery,
+    proveedoresQuery,
+    ordersQuery,
+    mermasQuery,
+    yearsQuery,
+  ]);
+
+  // If tables don't exist yet, return empty data instead of crashing
+  if (productosRes.error || proveedoresRes.error || ordersRes.error || mermasRes.error) {
+    return emptyDashboardData(filters);
+  }
+
+  const productos = (productosRes.data ?? []) as unknown as ProductoRaw[];
+  const proveedores = (proveedoresRes.data ?? []) as ProveedorRaw[];
+  const allOrders = (ordersRes.data ?? []) as unknown as OrdenRaw[];
+  const allMermas = (mermasRes.data ?? []) as MermaRaw[];
+
+  const inRange = (iso: string, startIso: string, endIso: string) => {
+    const t = new Date(iso).getTime();
+    return t >= new Date(startIso).getTime() && t < new Date(endIso).getTime();
+  };
+
+  let ordersCurrent: OrdenRaw[];
+  let ordersPrior: OrdenRaw[];
+  let mermasCurrent: MermaRaw[];
+  let mermasPrior: MermaRaw[];
+
+  if (isDia) {
+    const { day } = filters;
+    ordersCurrent = allOrders.filter((o) => isMatchingWeekday(o.fecha, day));
+    ordersPrior = [];
+    mermasCurrent = allMermas.filter((m) => isMatchingWeekday(m.fecha, day));
+    mermasPrior = [];
+  } else {
+    ordersCurrent = allOrders.filter((o) => inRange(o.fecha, range.start, range.end));
+    ordersPrior = allOrders.filter((o) => inRange(o.fecha, range.prevStart, range.prevEnd));
+    mermasCurrent = allMermas.filter((m) => inRange(m.fecha, range.start, range.end));
+    mermasPrior = allMermas.filter((m) => inRange(m.fecha, range.prevStart, range.prevEnd));
+  }
+
+  const productLookup = buildProductLookup(productos);
+  const supplierLookup = buildSupplierLookup(proveedores);
+
+  const metrics = aggregateMetrics({
+    productos,
+    ordersCurrent,
+    ordersPrior,
+    mermasCurrent,
+    mermasPrior,
+    includeChange: !isDia,
+  });
+
+  const spendingTrend = aggregateSpendingTrend({
+    orders: ordersCurrent,
+    mermas: mermasCurrent,
+    startIso: range.start,
+    bucketCount: range.bucketCount,
+  });
+
+  const availableYears = computeAvailableYears(
+    (yearsRes.data as { fecha: string }[] | null) ?? null,
+    allOrders,
+  );
+
+  const filterMeta: FilterMeta = {
+    mode: filters.mode,
+    period: filters.mode === "periodo" ? filters.period : undefined,
+    month: filters.mode === "mes" ? filters.month : undefined,
+    year: filters.mode === "mes" ? filters.year : undefined,
+    day: filters.mode === "dia" ? filters.day : undefined,
+    purchasesCount: ordersCurrent.length,
+    availableYears,
+  };
+
+  return {
+    metrics,
+    topProductos: aggregateTopProductos(ordersCurrent, productLookup),
+    topProveedores: aggregateTopProveedores(ordersCurrent, supplierLookup),
+    topMerma: aggregateTopMerma(mermasCurrent, productLookup),
+    criticalProducts: aggregateCriticalProducts(productos),
+    spendingTrend,
+    gastoPorCategoria: aggregateGastoPorCategoria(ordersCurrent, productLookup),
+    filterMeta,
+  };
+}
+
+function emptyDashboardData(filters: DashboardFilters): DashboardData {
+  const now = new Date();
+  const filterMeta: FilterMeta = {
+    mode: filters.mode,
+    period: filters.mode === "periodo" ? filters.period : undefined,
+    month: filters.mode === "mes" ? filters.month : undefined,
+    year: filters.mode === "mes" ? filters.year : undefined,
+    day: filters.mode === "dia" ? filters.day : undefined,
+    purchasesCount: 0,
+    availableYears: [now.getFullYear()],
+  };
+  return {
+    metrics: {
+      totalInventario: { value: 0 },
+      comprasDelMes: { value: 0 },
+      mermaDelMes: { value: 0 },
+      productosCriticos: 0,
+    },
+    topProductos: [],
+    topProveedores: [],
+    topMerma: [],
+    criticalProducts: [],
+    spendingTrend: [],
+    gastoPorCategoria: {},
+    filterMeta,
+  };
+}
+
+function computeAvailableYears(
+  yearsRows: { fecha: string }[] | null,
+  fallbackOrders: OrdenRaw[],
+): number[] {
+  const set = new Set<number>();
+  const source: { fecha: string }[] =
+    yearsRows ?? fallbackOrders.map((o) => ({ fecha: o.fecha }));
+  for (const r of source) {
+    if (!r.fecha) continue;
+    set.add(new Date(r.fecha).getFullYear());
+  }
+  if (set.size === 0) set.add(new Date().getFullYear());
+  return [...set].sort((a, b) => b - a);
+}

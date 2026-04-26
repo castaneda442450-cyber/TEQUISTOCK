@@ -17,7 +17,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { signOut } from "@/lib/actions/auth.actions";
-import { useRouter } from "next/navigation";
 
 const NAV_ITEMS = [
   { href: "/dashboard",    label: "Dashboard",    icon: LayoutDashboard },
@@ -30,14 +29,12 @@ const NAV_ITEMS = [
 
 export function Sidebar() {
   const pathname = usePathname();
-  const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
 
   const handleSignOut = async () => {
     setSigningOut(true);
     await signOut();
-    router.push("/auth/login");
   };
 
   return (

@@ -81,22 +81,83 @@ export interface Movimiento {
   producto?: Producto;
 }
 
-export interface ChartDataPoint {
-  fecha: string;
-  valor: number;
+// ─── Dashboard types ─────────────────────────────────────────────────────────
+
+export type FilterMode = "periodo" | "mes" | "dia";
+export type PeriodValue = 7 | 14 | 30 | 60 | 90;
+
+export type DashboardFilters =
+  | { mode: "periodo"; period: PeriodValue }
+  | { mode: "mes"; month: number; year: number }
+  | { mode: "dia"; day: number };
+
+export interface FilterMeta {
+  mode: FilterMode;
+  period?: PeriodValue;
+  month?: number;
+  year?: number;
+  day?: number;
+  purchasesCount: number;
+  availableYears: number[];
 }
 
-export interface MetricsData {
-  totalInventory: number;
-  monthPurchases: number;
-  monthMerma: number;
-  criticalCount: number;
+export interface MetricWithChange {
+  value: number;
+  change?: number;
 }
 
-export interface DashboardData extends MetricsData {
-  topProductos: Producto[];
-  topProveedores: Proveedor[];
-  topMermas: { motivo: string; cantidad: number; valor: number }[];
-  spendingTrend: ChartDataPoint[];
-  gastoPorCategoria: { categoria: string; valor: number }[];
+export interface DashboardMetrics {
+  totalInventario: MetricWithChange;
+  comprasDelMes: MetricWithChange;
+  mermaDelMes: MetricWithChange;
+  productosCriticos: number;
+}
+
+export interface TopProductoRow {
+  id: string;
+  nombre: string;
+  categoria: string;
+  unidad: string;
+  spent: number;
+}
+
+export interface TopProveedorRow {
+  id: string;
+  company: string;
+  totalSpent: number;
+  purchasesCount: number;
+}
+
+export interface TopMermaRow {
+  productoId: string;
+  nombre: string;
+  unidad: string;
+  motivoMermaTop: string;
+  qty: number;
+  value: number;
+}
+
+export interface CriticalProductRow {
+  id: string;
+  nombre: string;
+  unidad: string;
+  stock_actual: number;
+  stock_minimo: number;
+}
+
+export interface SpendingTrendPoint {
+  label: string;
+  compras: number;
+  merma: number;
+}
+
+export interface DashboardData {
+  metrics: DashboardMetrics;
+  topProductos: TopProductoRow[];
+  topProveedores: TopProveedorRow[];
+  topMerma: TopMermaRow[];
+  criticalProducts: CriticalProductRow[];
+  spendingTrend: SpendingTrendPoint[];
+  gastoPorCategoria: Record<string, number>;
+  filterMeta: FilterMeta;
 }
