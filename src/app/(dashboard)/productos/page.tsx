@@ -1,16 +1,36 @@
 import { getProductos, getCategorias } from "@/lib/actions/productos.actions";
 import ProductosClient from "./ProductosClient";
 
-export default async function ProductosPage() {
+interface ProductosPageProps {
+  searchParams: Promise<{
+    search?: string;
+    categoria?: string;
+    page?: string;
+  }>;
+}
+
+export default async function ProductosPage({ searchParams }: ProductosPageProps) {
+  const params = await searchParams;
+  const page = Number(params.page) > 0 ? Number(params.page) : 1;
+
   const [productosResult, { data: categorias }] = await Promise.all([
-    getProductos(),
+    getProductos({
+      search: params.search,
+      categoriaId: params.categoria,
+      page,
+    }),
     getCategorias(),
   ]);
 
   return (
     <ProductosClient
       productos={productosResult.data}
+      count={productosResult.count}
+      totalPages={productosResult.totalPages}
+      currentPage={productosResult.page}
       categorias={categorias ?? []}
+      initialSearch={params.search ?? ""}
+      initialCategoria={params.categoria ?? ""}
     />
   );
 }
