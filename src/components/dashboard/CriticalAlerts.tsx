@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { AlertTriangle } from "lucide-react";
 import type { CriticalProductRow } from "@/types";
 
@@ -10,34 +11,75 @@ export function CriticalAlerts({ products }: CriticalAlertsProps) {
 
   return (
     <div
-      className="rounded-card"
       style={{
-        background: "rgba(186, 48, 38, 0.06)",
-        border: "1.5px solid rgba(186, 48, 38, 0.20)",
-        padding: "14px 18px",
+        background: "hsl(var(--surface))",
+        border: "1px solid hsl(var(--border))",
+        borderRadius: 10,
+        padding: "12px 18px",
+        boxShadow: "0 1px 3px var(--shadow-color)",
       }}
     >
-      <div className="flex items-center gap-2 mb-2.5">
-        <AlertTriangle size={16} color="#BA3026" strokeWidth={2.2} />
-        <span className="text-[13px] font-bold text-terracota">
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 10 }}>
+        <AlertTriangle size={16} color="#BA3026" strokeWidth={2.3} />
+        <span style={{ fontSize: 13, fontWeight: 700, color: "hsl(8, 74%, 58%)" }}>
           ⚠ {products.length} producto{products.length === 1 ? "" : "s"} con stock crítico
         </span>
+        <Link
+          href="/productos?filter=critico"
+          style={{
+            marginLeft: "auto",
+            fontSize: 11,
+            fontWeight: 600,
+            color: "#BA3026",
+            textDecoration: "none",
+            opacity: 0.7,
+            display: "flex",
+            alignItems: "center",
+            gap: 3,
+          }}
+        >
+          Ver todos →
+        </Link>
       </div>
-      <div className="flex flex-wrap gap-2">
+
+      {/* Product chips */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
         {products.map((p) => (
-          <div
+          <Link
             key={p.id}
-            className="flex items-center gap-2.5 bg-surface rounded-md"
-            style={{
-              padding: "8px 14px",
-              border: "1px solid rgba(186, 48, 38, 0.20)",
-            }}
+            href={`/productos?search=${encodeURIComponent(p.nombre)}`}
+            style={{ textDecoration: "none" }}
           >
-            <span className="text-[12px] font-semibold text-text-main">{p.nombre}</span>
-            <span className="text-[11px] text-terracota tabular-nums">
-              {p.stock_actual} {p.unidad} / mín {p.stock_minimo} {p.unidad}
-            </span>
-          </div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                background: "hsl(var(--surface-alt))",
+                border: "1px solid hsl(var(--border))",
+                borderRadius: 8,
+                padding: "5px 12px",
+                cursor: "pointer",
+                transition: "border-color 0.15s, box-shadow 0.15s",
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(186,48,38,0.5)";
+                (e.currentTarget as HTMLDivElement).style.boxShadow = "0 2px 8px rgba(186,48,38,0.10)";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(186,48,38,0.22)";
+                (e.currentTarget as HTMLDivElement).style.boxShadow = "none";
+              }}
+            >
+              <span style={{ fontSize: 12, fontWeight: 600, color: "hsl(var(--text-main))" }}>
+                {p.nombre}
+              </span>
+              <span style={{ fontSize: 11, color: "hsl(8, 74%, 58%)", fontVariantNumeric: "tabular-nums" }}>
+                {p.stock_actual} {p.unidad} / mín {p.stock_minimo} {p.unidad}
+              </span>
+            </div>
+          </Link>
         ))}
       </div>
     </div>

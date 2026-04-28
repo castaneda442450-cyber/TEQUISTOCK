@@ -1,8 +1,16 @@
-export default function ProductosPage() {
+import { getProductos, getCategorias } from "@/lib/actions/productos.actions";
+import ProductosClient from "./ProductosClient";
+
+export default async function ProductosPage() {
+  const [productosResult, { data: categorias }] = await Promise.all([
+    getProductos(),
+    getCategorias(),
+  ]);
+
   return (
-    <div className="p-6">
-      <h1 className="text-3xl font-bold text-text-main">Productos</h1>
-      {/* Content will be implemented */}
-    </div>
+    <ProductosClient
+      productos={productosResult.data}
+      categorias={categorias ?? []}
+    />
   );
 }

@@ -22,21 +22,22 @@ export function SpendingTrendChart({ data }: SpendingTrendChartProps) {
         label: "Compras",
         data: data.map((d) => d.compras),
         borderColor: TERRACOTA,
-        backgroundColor: `${TERRACOTA}18`,
+        backgroundColor: `${TERRACOTA}14`,
         fill: true,
         tension: 0.4,
         pointRadius: 2,
-        borderWidth: 2,
+        borderWidth: 3,
       },
       {
         label: "Merma",
         data: data.map((d) => d.merma),
         borderColor: GOLD,
-        backgroundColor: `${GOLD}18`,
+        backgroundColor: `${GOLD}14`,
         fill: true,
         tension: 0.4,
         pointRadius: 2,
         borderWidth: 2,
+        borderDash: [5, 4],
       },
       {
         label: "Neto",
@@ -47,7 +48,7 @@ export function SpendingTrendChart({ data }: SpendingTrendChartProps) {
         tension: 0.4,
         pointRadius: 2,
         borderWidth: 2,
-        borderDash: [4, 3],
+        borderDash: [3, 3],
       },
     ],
   };
@@ -85,7 +86,7 @@ export function SpendingTrendChart({ data }: SpendingTrendChartProps) {
   };
 
   return (
-    <div style={{ height: 240 }}>
+    <div style={{ height: 220 }}>
       <Line data={chartData} options={options} />
     </div>
   );

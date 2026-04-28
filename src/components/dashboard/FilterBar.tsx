@@ -54,26 +54,38 @@ export function FilterBar({ meta }: FilterBarProps) {
 
   return (
     <div
-      className="bg-surface border border-border rounded-card px-5 py-4 flex flex-col gap-3.5 transition-opacity"
-      style={{ opacity: isPending ? 0.7 : 1 }}
+      style={{
+        opacity: isPending ? 0.7 : 1,
+        transition: "opacity 150ms",
+        background: "hsl(var(--surface))",
+        border: "1px solid hsl(var(--border))",
+        borderRadius: 10,
+        padding: "14px 20px",
+        boxShadow: "0 1px 3px var(--shadow-color), 0 6px 18px var(--shadow-color)",
+        display: "flex",
+        flexDirection: "column",
+        gap: 12,
+      }}
     >
       {/* Mode tabs */}
-      <div className="flex gap-1.5">
-        <ModePill active={meta.mode === "periodo"} onClick={() => onMode("periodo")} icon={<Calendar size={13} />}>
+      <div style={{ display: "flex", gap: 6 }}>
+        <ModePill active={meta.mode === "periodo"} onClick={() => onMode("periodo")} icon={<Calendar size={12} />}>
           Por período
         </ModePill>
-        <ModePill active={meta.mode === "mes"} onClick={() => onMode("mes")} icon={<CalendarRange size={13} />}>
+        <ModePill active={meta.mode === "mes"} onClick={() => onMode("mes")} icon={<CalendarRange size={12} />}>
           Por mes
         </ModePill>
-        <ModePill active={meta.mode === "dia"} onClick={() => onMode("dia")} icon={<CalendarDays size={13} />}>
+        <ModePill active={meta.mode === "dia"} onClick={() => onMode("dia")} icon={<CalendarDays size={12} />}>
           Por día
         </ModePill>
       </div>
 
       {/* Period pills */}
       {meta.mode === "periodo" && (
-        <div className="flex gap-2 flex-wrap items-center">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">RANGO:</span>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: "hsl(var(--text-muted))", letterSpacing: "0.4px", textTransform: "uppercase" }}>
+            RANGO:
+          </span>
           {PERIODS.map((v) => (
             <ValuePill
               key={v}
@@ -88,9 +100,9 @@ export function FilterBar({ meta }: FilterBarProps) {
 
       {/* Month + Year pills */}
       {meta.mode === "mes" && (
-        <div className="flex gap-4 flex-wrap items-center">
-          <div className="flex gap-1.5 flex-wrap items-center">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted self-center">MES:</span>
+        <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: "#B0A89E", letterSpacing: "0.4px", textTransform: "uppercase" }}>MES:</span>
             {MESES_SHORT.map((m, i) => (
               <ValuePill
                 key={i}
@@ -102,8 +114,8 @@ export function FilterBar({ meta }: FilterBarProps) {
               </ValuePill>
             ))}
           </div>
-          <div className="flex gap-1.5 items-center">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">AÑO:</span>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: "#B0A89E", letterSpacing: "0.4px", textTransform: "uppercase" }}>AÑO:</span>
             {meta.availableYears.map((y) => (
               <ValuePill
                 key={y}
@@ -120,8 +132,8 @@ export function FilterBar({ meta }: FilterBarProps) {
 
       {/* Day-of-week pills */}
       {meta.mode === "dia" && (
-        <div className="flex gap-2 flex-wrap items-center">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">DÍA:</span>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: "#B0A89E", letterSpacing: "0.4px", textTransform: "uppercase" }}>DÍA:</span>
           {DIAS.map((d, i) => (
             <ValuePill
               key={d}
@@ -135,10 +147,11 @@ export function FilterBar({ meta }: FilterBarProps) {
       )}
 
       {/* Status line */}
-      <div className="flex items-center gap-2">
-        <div className="w-1.5 h-1.5 rounded-full bg-terracota" />
-        <span className="text-[11px] text-text-muted">
-          {statusLine.prefix} · <b className="text-text-sub">{statusLine.count}</b>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <div style={{ width: 6, height: 6, borderRadius: 99, background: "#BA3026", flexShrink: 0 }} />
+        <span style={{ fontSize: 11, color: "hsl(var(--text-muted))" }}>
+          {statusLine.prefix} ·{" "}
+          <b style={{ color: "hsl(var(--text-sub))", fontWeight: 600 }}>{statusLine.count}</b>
         </span>
       </div>
     </div>
@@ -154,12 +167,12 @@ function buildStatusLine(meta: FilterMeta): { prefix: string; count: string } {
   const count =
     meta.purchasesCount === 1
       ? "1 compra"
-      : `${meta.purchasesCount.toLocaleString("en-US")} compras`;
+      : `${meta.purchasesCount.toLocaleString("es-MX")} compras`;
 
   return { prefix, count };
 }
 
-// ─── Pill primitives ─────────────────────────────────────────────────────────
+// ─── Primitives ──────────────────────────────────────────────────────────────
 
 interface PillProps {
   active: boolean;
@@ -172,12 +185,21 @@ function ModePill({ active, onClick, icon, children }: PillProps & { icon: React
     <button
       type="button"
       onClick={onClick}
-      className={[
-        "flex items-center gap-1.5 px-[18px] py-[7px] rounded-pill text-[12px] font-semibold border transition-all",
-        active
-          ? "bg-terracota text-white border-terracota"
-          : "bg-surface text-text-sub border-border hover:border-border-strong",
-      ].join(" ")}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "6px 16px",
+        borderRadius: 99,
+        border: `1.5px solid ${active ? "#BA3026" : "#E8E2DA"}`,
+        background: active ? "#BA3026" : "#FFFFFF",
+        color: active ? "#FFFFFF" : "#7A7068",
+        fontSize: 12,
+        fontWeight: 600,
+        cursor: "pointer",
+        fontFamily: "inherit",
+        transition: "all 0.15s ease",
+      }}
     >
       {icon}
       {children}
@@ -190,18 +212,18 @@ function ValuePill({ active, onClick, children, small }: PillProps & { small?: b
     <button
       type="button"
       onClick={onClick}
-      className={[
-        "rounded-pill border transition-all",
-        small ? "px-3 py-[5px] text-[11px]" : "px-[14px] py-[5px] text-[12px]",
-        active
-          ? "border-terracota text-terracota font-bold"
-          : "border-border text-text-sub font-normal hover:border-border-strong",
-      ].join(" ")}
-      style={
-        active
-          ? { background: "rgba(186, 48, 38, 0.10)" }
-          : { background: "transparent" }
-      }
+      style={{
+        padding: small ? "4px 10px" : "4px 14px",
+        borderRadius: 99,
+        border: `1.5px solid ${active ? "#BA3026" : "#E8E2DA"}`,
+        background: active ? "rgba(186, 48, 38, 0.08)" : "transparent",
+        color: active ? "#BA3026" : "#7A7068",
+        fontSize: small ? 11 : 12,
+        fontWeight: active ? 700 : 400,
+        cursor: "pointer",
+        fontFamily: "inherit",
+        transition: "all 0.15s ease",
+      }}
     >
       {children}
     </button>

@@ -1,8 +1,17 @@
-export default function SalidasPage() {
+import { getMovimientos } from "@/lib/actions/salidas.actions";
+import { getProductos } from "@/lib/actions/productos.actions";
+import SalidasClient from "./SalidasClient";
+
+export default async function SalidasPage() {
+  const [{ data: movimientos }, { data: productos }] = await Promise.all([
+    getMovimientos(undefined, 200),
+    getProductos(),
+  ]);
+
   return (
-    <div className="p-6">
-      <h1 className="text-3xl font-bold text-text-main">Salidas</h1>
-      {/* Content will be implemented */}
-    </div>
+    <SalidasClient
+      movimientos={movimientos ?? []}
+      productos={productos ?? []}
+    />
   );
 }

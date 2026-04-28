@@ -6,10 +6,9 @@ interface MetricCardProps {
   value: string;
   icon: ReactNode;
   iconBg: string;
-  /** Percent change vs prior period. Positive=up, negative=down. Undefined hides the row. */
   change?: number;
-  /** Lower-is-better metrics: invert the color (down=green, up=red). */
   invertChangeColor?: boolean;
+  valueColor?: string;
   changeLabel?: string;
 }
 
@@ -20,6 +19,7 @@ export function MetricCard({
   iconBg,
   change,
   invertChangeColor,
+  valueColor,
   changeLabel = "vs mes anterior",
 }: MetricCardProps) {
   const showChange = change !== undefined && Number.isFinite(change);
@@ -28,31 +28,78 @@ export function MetricCard({
   const changeColor = isGood ? "#106653" : "#BA3026";
 
   return (
-    <div className="flex items-center gap-4 bg-surface border border-border rounded-card shadow-card transition-all duration-150 hover:-translate-y-0.5 hover:shadow-hover px-[22px] py-5">
+    <div
+      style={{
+        background: "hsl(var(--surface))",
+        borderRadius: 10,
+        border: "1px solid hsl(var(--border))",
+        boxShadow: "0 1px 3px var(--shadow-color), 0 6px 18px var(--shadow-color)",
+        padding: "24px 28px",
+        display: "flex",
+        alignItems: "center",
+        gap: 16,
+        transition: "transform 150ms ease-out, box-shadow 150ms ease-out",
+      }}
+    >
       <div
-        className="flex shrink-0 items-center justify-center w-12 h-12 rounded-full"
-        style={{ background: iconBg }}
+        style={{
+          flexShrink: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: 44,
+          height: 44,
+          borderRadius: 999,
+          background: iconBg,
+        }}
       >
         {icon}
       </div>
-      <div className="flex-1 min-w-0">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.5px] text-text-sub mb-1">
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            fontSize: 11,
+            fontWeight: 600,
+            textTransform: "uppercase",
+            letterSpacing: "0.5px",
+            color: "hsl(var(--text-muted))",
+            marginBottom: 6,
+          }}
+        >
           {label}
         </div>
-        <div className="text-[22px] font-bold text-text-main leading-none tabular-nums">
+        <div
+          className="tabular-nums"
+          style={{
+            fontSize: 24,
+            fontWeight: 800,
+            lineHeight: 1,
+            color: valueColor ?? "hsl(var(--text-main))",
+          }}
+        >
           {value}
         </div>
         {showChange && (
-          <div className="flex items-center gap-1 mt-1.5">
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+              marginTop: 8,
+            }}
+          >
             {up ? (
-              <ArrowUp size={12} color={changeColor} strokeWidth={2.5} />
+              <ArrowUp size={12} color={changeColor} strokeWidth={2.6} />
             ) : (
-              <ArrowDown size={12} color={changeColor} strokeWidth={2.5} />
+              <ArrowDown size={12} color={changeColor} strokeWidth={2.6} />
             )}
-            <span className="text-[11px] font-semibold" style={{ color: changeColor }}>
+            <span
+              className="tabular-nums"
+              style={{ fontSize: 12, fontWeight: 600, color: changeColor }}
+            >
               {Math.abs(change!).toFixed(1)}%
             </span>
-            <span className="text-[11px] text-text-muted">{changeLabel}</span>
+            <span style={{ fontSize: 12, color: "hsl(var(--text-muted))" }}>{changeLabel}</span>
           </div>
         )}
       </div>

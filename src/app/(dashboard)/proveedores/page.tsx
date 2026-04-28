@@ -1,8 +1,17 @@
-export default function ProveedoresPage() {
+import { getProveedores } from "@/lib/actions/proveedores.actions";
+import { getProductos } from "@/lib/actions/productos.actions";
+import ProveedoresClient from "./ProveedoresClient";
+
+export default async function ProveedoresPage() {
+  const [{ data: proveedores }, { data: productos }] = await Promise.all([
+    getProveedores(),
+    getProductos(),
+  ]);
+
   return (
-    <div className="p-6">
-      <h1 className="text-3xl font-bold text-text-main">Proveedores</h1>
-      {/* Content will be implemented */}
-    </div>
+    <ProveedoresClient
+      proveedores={proveedores ?? []}
+      productos={productos ?? []}
+    />
   );
 }

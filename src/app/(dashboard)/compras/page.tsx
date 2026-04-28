@@ -1,8 +1,20 @@
-export default function ComprasPage() {
+import { getOrdenes } from "@/lib/actions/compras.actions";
+import { getProveedores } from "@/lib/actions/proveedores.actions";
+import { getProductos } from "@/lib/actions/productos.actions";
+import ComprasClient from "./ComprasClient";
+
+export default async function ComprasPage() {
+  const [{ data: ordenes }, { data: proveedores }, { data: productos }] = await Promise.all([
+    getOrdenes(),
+    getProveedores(),
+    getProductos(),
+  ]);
+
   return (
-    <div className="p-6">
-      <h1 className="text-3xl font-bold text-text-main">Compras</h1>
-      {/* Content will be implemented */}
-    </div>
+    <ComprasClient
+      ordenes={ordenes ?? []}
+      proveedores={(proveedores ?? []).filter((p) => p.activo)}
+      productos={productos ?? []}
+    />
   );
 }

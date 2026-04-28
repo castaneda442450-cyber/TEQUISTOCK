@@ -41,10 +41,10 @@ const config = {
         pill: "99px",
       },
       boxShadow: {
-        card: "0 2px 8px var(--shadow)",
-        hover: "0 6px 20px rgba(0,0,0,0.10)",
-        "hover-lg": "0 6px 20px rgba(0,0,0,0.10)",
-        modal: "0 32px 80px rgba(0,0,0,0.28)",
+        card: "0 1px 2px var(--shadow-color), 0 4px 14px var(--shadow-color)",
+        hover: "0 2px 4px var(--shadow-color), 0 8px 24px var(--shadow-color-md)",
+        "hover-lg": "0 8px 28px var(--shadow-color-md)",
+        modal: "0 32px 80px var(--shadow-color-lg)",
       },
       animation: {
         spin: "spin 0.7s linear infinite",

@@ -9,7 +9,7 @@ interface MetricsRowProps {
 
 export function MetricsRow({ metrics }: MetricsRowProps) {
   return (
-    <div className="grid grid-cols-4 gap-4">
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20 }}>
       <MetricCard
         label="Total Inventario"
         value={formatCurrency(metrics.totalInventario.value)}
@@ -23,13 +23,13 @@ export function MetricsRow({ metrics }: MetricsRowProps) {
         icon={<ShoppingCart size={20} color="#0B4455" strokeWidth={2.2} />}
         iconBg="rgba(11, 68, 85, 0.13)"
         change={metrics.comprasDelMes.change}
-        invertChangeColor
       />
       <MetricCard
         label="Merma del Mes"
         value={formatCurrency(metrics.mermaDelMes.value)}
-        icon={<AlertCircle size={20} color="#E67E22" strokeWidth={2.2} />}
-        iconBg="rgba(230, 126, 34, 0.13)"
+        icon={<AlertCircle size={20} color="#BA3026" strokeWidth={2.2} />}
+        iconBg="rgba(186, 48, 38, 0.13)"
+        valueColor="#BA3026"
         change={metrics.mermaDelMes.change}
         invertChangeColor
       />

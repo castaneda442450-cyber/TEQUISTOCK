@@ -10,39 +10,43 @@
   --navy: 190 60% 33%;
   --green: 154 60% 45%;
   --dark-green: 165 75% 30%;
-  --bg: 30 50% 97%;
+  --bg: 30 38% 95%;
   --surface: 0 0% 100%;
-  --surface-alt: 20 33% 96%;
-  --surface-hover: 15 29% 94%;
-  --border: 20 29% 91%;
-  --border-strong: 20 14% 82%;
+  --surface-alt: 30 33% 96%;
+  --surface-hover: 15 29% 93%;
+  --border: 25 26% 88%;
+  --border-strong: 22 18% 78%;
   --text-main: 15 27% 11%;
   --text-sub: 26 17% 47%;
   --text-muted: 20 11% 69%;
   --nav-bg: 190 60% 33%;
-  --shadow: 0 0% 0% / 6%;
-  --shadow-md: 0 0% 0% / 10%;
-  --shadow-lg: 0 0% 0% / 18%;
+  /* Shadows tuned to give cards real elevation against the cream bg */
+  --shadow-color: rgba(28, 23, 20, 0.05);
+  --shadow-color-md: rgba(28, 23, 20, 0.08);
+  --shadow-color-lg: rgba(28, 23, 20, 0.16);
 }
 
 /* Cloud Design Tokens - Dark Mode */
 .dark {
-  --terracota: 10 72% 61%;
-  --terracota-dark: 10 60% 50%;
-  --gold: 40 72% 63%;
-  --navy: 210 42% 50%;
-  --green: 170 54% 55%;
-  --dark-green: 170 60% 45%;
-  --bg: 220 13% 7%;
-  --surface: 220 13% 11%;
-  --surface-alt: 220 13% 14%;
-  --surface-hover: 220 12% 20%;
-  --border: 220 12% 18%;
-  --border-strong: 220 10% 27%;
-  --text-main: 220 13% 93%;
-  --text-sub: 220 12% 65%;
-  --text-muted: 220 10% 38%;
-  --nav-bg: 220 13% 7%;
+  --terracota: 10 75% 65%;
+  --terracota-dark: 10 65% 55%;
+  --gold: 40 75% 68%;
+  --navy: 210 50% 58%;
+  --green: 170 60% 62%;
+  --dark-green: 170 65% 52%;
+  --bg: 220 20% 8%;
+  --surface: 220 16% 13%;
+  --surface-alt: 220 14% 18%;
+  --surface-hover: 220 13% 24%;
+  --border: 220 14% 22%;
+  --border-strong: 220 12% 32%;
+  --text-main: 220 15% 95%;
+  --text-sub: 220 12% 72%;
+  --text-muted: 220 10% 50%;
+  --nav-bg: 220 20% 8%;
+  --shadow-color: rgba(0, 0, 0, 0.35);
+  --shadow-color-md: rgba(0, 0, 0, 0.50);
+  --shadow-color-lg: rgba(0, 0, 0, 0.65);
 }
 
 * {
@@ -56,6 +60,9 @@ html {
 body {
   background-color: hsl(var(--bg));
   color: hsl(var(--text-main));
+  font-family: var(--font-plus-jakarta), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -66,5 +73,21 @@ h1, h2, h3, h4, h5, h6 {
 input:focus, textarea:focus, select:focus {
   outline: none;
   border-color: hsl(var(--terracota));
-  box-shadow: 0 0 0 3px hsl(var(--terracota) / 0.2);
+  box-shadow: 0 0 0 3px hsl(var(--terracota) / 0.15);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--border-strong));
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--text-muted));
 }

@@ -45,22 +45,25 @@ export function RankingCard({
       ) : (
         <div className="flex flex-col">
           {items.map((it, i) => (
-            <div key={it.key} className={i < items.length - 1 ? "mb-4" : ""}>
-              <div className="flex items-start justify-between gap-2 mb-1">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[11px] font-bold text-text-muted">#{i + 1}</span>
-                    <span className="text-[12px] font-semibold text-text-main truncate">
+            <div
+              key={it.key}
+              style={{ marginBottom: i < items.length - 1 ? 18 : 0 }}
+            >
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 6 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: "#B0A89E" }}>#{i + 1}</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: "#1C1714", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {it.name}
                     </span>
                   </div>
-                  {it.badge && <div className="mt-1">{it.badge}</div>}
+                  {it.badge && <div style={{ marginTop: 5 }}>{it.badge}</div>}
                 </div>
-                <div className="text-right shrink-0 ml-2">
-                  <div className="text-[14px] font-bold tabular-nums" style={{ color: accentColor }}>
+                <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 8 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: accentColor, fontVariantNumeric: "tabular-nums" }}>
                     {formatCurrency(it.value)}
                   </div>
-                  <div className="text-[10px] text-text-muted">
+                  <div style={{ fontSize: 11, color: "#B0A89E", marginTop: 1 }}>
                     {total && total > 0
                       ? `${((it.value / total) * 100).toFixed(1)}%`
                       : it.sublabel}

@@ -36,7 +36,7 @@ export function RankingsRow({
   totals,
 }: RankingsRowProps) {
   return (
-    <div className="grid grid-cols-3 gap-4">
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20 }}>
       <RankingCard
         title="Top 5 Productos Más Costosos"
         icon={<DollarSign size={15} color="#BA3026" strokeWidth={2.2} />}
@@ -65,8 +65,8 @@ export function RankingsRow({
       />
       <RankingCard
         title="Top 5 Mayor Merma"
-        icon={<Trash2 size={15} color="#E67E22" strokeWidth={2.2} />}
-        iconBg="rgba(230, 126, 34, 0.13)"
+        icon={<Trash2 size={15} color="#BA3026" strokeWidth={2.2} />}
+        iconBg="rgba(186, 48, 38, 0.13)"
         accentColor="#BA3026"
         items={topMerma.map((m) => ({
           key: m.productoId,

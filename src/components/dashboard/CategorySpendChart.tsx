@@ -62,14 +62,14 @@ export function CategorySpendChart({ data }: CategorySpendChartProps) {
 
   if (labels.length === 0) {
     return (
-      <div style={{ height: 240 }} className="flex items-center justify-center">
+      <div style={{ height: 220 }} className="flex items-center justify-center">
         <span className="text-[12px] text-text-muted">Sin gastos en este rango</span>
       </div>
     );
   }
 
   return (
-    <div style={{ height: 240 }}>
+    <div style={{ height: 220 }}>
       <Bar data={chartData} options={options} />
     </div>
   );

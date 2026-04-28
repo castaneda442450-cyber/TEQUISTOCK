@@ -1,116 +1,164 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { ChevronDown, LogOut, User } from "lucide-react";
-import { ThemeToggle } from "@/components/shared/ThemeToggle";
+import { usePathname } from "next/navigation";
+import { LogOut } from "lucide-react";
 import { signOut } from "@/lib/actions/auth.actions";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+
+const PAGE_META: Record<string, { title: string; subtitle: string }> = {
+  "/dashboard":   { title: "Dashboard",    subtitle: "Vista general del inventario" },
+  "/productos":   { title: "Productos",    subtitle: "Gestión de inventario" },
+  "/proveedores": { title: "Proveedores",  subtitle: "Gestión de proveedores" },
+  "/compras":     { title: "Compras",      subtitle: "Órdenes de compra" },
+  "/salidas":     { title: "Salidas",      subtitle: "Consumos y mermas" },
+  "/reportes":    { title: "Reportes",     subtitle: "Reportes e informes" },
+};
 
 interface TopBarProps {
-  title: string;
-  subtitle?: string;
   userEmail?: string;
 }
 
-export function TopBar({ title, subtitle, userEmail }: TopBarProps) {
-  const router = useRouter();
+export function TopBar({ userEmail }: TopBarProps) {
   const [signingOut, setSigningOut] = useState(false);
+  const pathname = usePathname();
 
-  const initials = userEmail
-    ? userEmail.slice(0, 2).toUpperCase()
-    : "US";
+  const meta = PAGE_META[pathname] ?? { title: "TequiStock", subtitle: "Control de Inventarios" };
 
   const handleSignOut = async () => {
     setSigningOut(true);
     await signOut();
-    router.push("/auth/login");
   };
 
   return (
     <header
-      className="sticky top-0 z-40 h-16 border-b flex items-center px-6"
       style={{
-        backgroundColor: "hsl(var(--surface) / 0.85)",
-        borderColor: "hsl(var(--border))",
+        position: "sticky",
+        top: 0,
+        zIndex: 40,
+        height: 64,
+        borderBottom: `1px solid hsl(var(--border))`,
+        display: "flex",
+        alignItems: "center",
+        paddingLeft: 24,
+        paddingRight: 24,
+        gap: 16,
+        backgroundColor: `hsl(var(--surface) / 0.92)`,
         backdropFilter: "blur(12px)",
         WebkitBackdropFilter: "blur(12px)",
       }}
     >
       {/* Left: title & subtitle */}
-      <div className="flex-1 min-w-0">
+      <div style={{ flex: 1, minWidth: 0 }}>
         <h1
-          className="font-bold text-[18px] leading-tight truncate"
-          style={{ color: "hsl(var(--text-main))" }}
+          style={{
+            fontSize: 16,
+            fontWeight: 700,
+            lineHeight: 1.2,
+            color: "hsl(var(--text-main))",
+            margin: 0,
+            letterSpacing: "-0.01em",
+          }}
         >
-          {title}
+          {meta.title}
         </h1>
-        {subtitle && (
-          <p
-            className="text-[12px] leading-tight truncate"
-            style={{ color: "hsl(var(--text-sub))" }}
-          >
-            {subtitle}
-          </p>
-        )}
+        <p
+          style={{
+            fontSize: 12,
+            lineHeight: 1.2,
+            color: "hsl(var(--text-sub))",
+            margin: "2px 0 0 0",
+          }}
+        >
+          {meta.subtitle}
+        </p>
       </div>
 
-      {/* Right: theme toggle + avatar */}
-      <div className="flex items-center gap-2">
-        <ThemeToggle />
+      {/* Right: avatar + user info + salir */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+        <div
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: 999,
+            background: "hsl(var(--terracota))",
+            color: "#FFFFFF",
+            fontSize: 11,
+            fontWeight: 700,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+          }}
+        >
+          AD
+        </div>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-surface-hover transition-colors group outline-none">
-              <div
-                className="h-8 w-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
-                style={{ backgroundColor: "hsl(var(--terracota))" }}
-              >
-                {initials}
-              </div>
-              {userEmail && (
-                <span
-                  className="text-xs max-w-[140px] truncate hidden sm:block"
-                  style={{ color: "hsl(var(--text-sub))" }}
-                >
-                  {userEmail}
-                </span>
-              )}
-              <ChevronDown
-                size={14}
-                className="flex-shrink-0 transition-transform"
-                style={{ color: "hsl(var(--text-muted))" }}
-              />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-52">
-            {userEmail && (
-              <>
-                <div className="px-3 py-2">
-                  <p className="text-xs font-medium truncate" style={{ color: "hsl(var(--text-main))" }}>
-                    {userEmail}
-                  </p>
-                  <p className="text-[11px]" style={{ color: "hsl(var(--text-muted))" }}>
-                    Administrador
-                  </p>
-                </div>
-                <DropdownMenuSeparator />
-              </>
-            )}
-            <DropdownMenuItem
-              onClick={handleSignOut}
-              disabled={signingOut}
-              className="text-sm cursor-pointer gap-2"
-            >
-              <LogOut size={14} />
-              {signingOut ? "Cerrando..." : "Cerrar sesión"}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div style={{ lineHeight: 1.3 }}>
+          <p
+            style={{
+              fontSize: 13,
+              fontWeight: 600,
+              color: "hsl(var(--text-main))",
+              margin: 0,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              maxWidth: 160,
+            }}
+          >
+            {userEmail ?? "admin"}
+          </p>
+          <p
+            style={{
+              fontSize: 11,
+              color: "hsl(var(--text-muted))",
+              margin: "1px 0 0 0",
+            }}
+          >
+            Administrador
+          </p>
+        </div>
+
+        <div
+          style={{
+            width: 1,
+            height: 20,
+            background: "hsl(var(--border))",
+            flexShrink: 0,
+          }}
+        />
+
+        <button
+          onClick={handleSignOut}
+          disabled={signingOut}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "5px 12px",
+            borderRadius: 8,
+            fontSize: 13,
+            fontWeight: 500,
+            color: "hsl(var(--terracota))",
+            border: `1px solid hsl(var(--terracota) / 0.20)`,
+            background: `hsl(var(--terracota) / 0.04)`,
+            cursor: "pointer",
+            transition: "all 0.15s ease",
+            fontFamily: "inherit",
+            opacity: signingOut ? 0.5 : 1,
+          }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.background = `hsl(var(--terracota) / 0.08)`;
+            (e.currentTarget as HTMLButtonElement).style.borderColor = `hsl(var(--terracota) / 0.35)`;
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.background = `hsl(var(--terracota) / 0.04)`;
+            (e.currentTarget as HTMLButtonElement).style.borderColor = `hsl(var(--terracota) / 0.20)`;
+          }}
+        >
+          <LogOut size={13} />
+          <span>{signingOut ? "..." : "Salir"}</span>
+        </button>
       </div>
     </header>
   );
