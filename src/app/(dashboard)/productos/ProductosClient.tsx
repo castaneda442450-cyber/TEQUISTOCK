@@ -2,17 +2,14 @@
 
 import { useState, useTransition, useEffect, useRef } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { Plus, Search, X } from "lucide-react";
-import { productoSchema, type ProductoInput } from "@/lib/schemas/producto.schema";
-import { createProducto, updateProducto, deleteProducto } from "@/lib/actions/productos.actions";
-import { UNIDADES } from "@/lib/constants";
+import { deleteProducto } from "@/lib/actions/productos.actions";
 import type { Producto, Categoria } from "@/types";
 import { ProductosTable } from "@/components/productos/ProductosTable";
 import { Pagination } from "@/components/productos/Pagination";
 import { EmptyState } from "@/components/productos/EmptyState";
+import { ProductoModal } from "@/components/productos/ProductoModal";
 
 interface Props {
   productos: Producto[];
@@ -29,7 +26,7 @@ export default function ProductosClient({
   count,
   totalPages,
   currentPage,
-  categorias,
+  categorias: initialCategorias,
   initialSearch,
   initialCategoria,
 }: Props) {
@@ -38,12 +35,17 @@ export default function ProductosClient({
   const searchParams = useSearchParams();
 
   const [searchInput, setSearchInput] = useState(initialSearch);
+  const [categorias, setCategorias] = useState<Categoria[]>(initialCategorias);
   const [showModal, setShowModal] = useState(false);
   const [editTarget, setEditTarget] = useState<Producto | null>(null);
-  const [isPending, startTransition] = useTransition();
   const [, startNavTransition] = useTransition();
 
-  // Sync local search input if URL changes externally
+  // Sync categorias if server re-fetches with new list
+  useEffect(() => {
+    setCategorias(initialCategorias);
+  }, [initialCategorias]);
+
+  // Sync search input when URL changes externally
   useEffect(() => {
     setSearchInput(initialSearch);
   }, [initialSearch]);
@@ -92,54 +94,19 @@ export default function ProductosClient({
     }
   }
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors },
-  } = useForm<ProductoInput>({
-    resolver: zodResolver(productoSchema),
-    defaultValues: { nombre: "", categoria_id: "", unidad: "kg", stock_minimo: 5, last_price: 0 },
-  });
-
   function openCreate() {
     setEditTarget(null);
-    reset({ nombre: "", categoria_id: categorias[0]?.id ?? "", unidad: "kg", stock_minimo: 5, last_price: 0 });
     setShowModal(true);
   }
 
   function openEdit(p: Producto) {
     setEditTarget(p);
-    reset({
-      nombre: p.nombre,
-      categoria_id: p.categoria_id,
-      unidad: p.unidad,
-      stock_minimo: p.stock_minimo,
-      last_price: p.last_price,
-    });
     setShowModal(true);
-  }
-
-  function onSubmit(data: ProductoInput) {
-    startTransition(async () => {
-      if (editTarget) {
-        const res = await updateProducto(editTarget.id, data);
-        if (res.error) { toast.error(res.error); return; }
-        toast.success("Producto actualizado");
-      } else {
-        const res = await createProducto(data);
-        if (res.error) { toast.error(res.error); return; }
-        toast.success("Producto creado");
-      }
-      setShowModal(false);
-      router.refresh();
-    });
   }
 
   function handleDelete(p: Producto) {
     if (!confirm(`¿Eliminar "${p.nombre}"? Esta acción no se puede deshacer.`)) return;
-    startTransition(async () => {
-      const res = await deleteProducto(p.id);
+    deleteProducto(p.id).then((res) => {
       if (res.error) { toast.error(res.error); return; }
       toast.success("Producto eliminado");
       router.refresh();
@@ -149,26 +116,16 @@ export default function ProductosClient({
   return (
     <div style={{ padding: 28 }}>
       {/* Header: search + filter + nuevo */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 14,
-          marginBottom: 22,
-          flexWrap: "wrap",
-        }}
-      >
-        {/* Search input */}
+      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 22, flexWrap: "wrap" }}>
+
+        {/* Search */}
         <div style={{ position: "relative", width: 240 }}>
           <Search
             size={15}
             style={{
-              position: "absolute",
-              left: 12,
-              top: "50%",
+              position: "absolute", left: 12, top: "50%",
               transform: "translateY(-50%)",
-              color: "hsl(var(--text-muted))",
-              pointerEvents: "none",
+              color: "hsl(var(--text-muted))", pointerEvents: "none",
             }}
           />
           <input
@@ -176,14 +133,10 @@ export default function ProductosClient({
             onChange={(e) => setSearchInput(e.target.value)}
             placeholder="Buscar por nombre..."
             style={{
-              width: "100%",
-              padding: "9px 32px 9px 36px",
-              fontSize: 13,
-              borderRadius: 8,
-              border: "1px solid hsl(var(--border))",
-              backgroundColor: "hsl(var(--surface))",
-              color: "hsl(var(--text-main))",
-              outline: "none",
+              width: "100%", padding: "9px 32px 9px 36px", fontSize: 13,
+              borderRadius: 8, border: "1px solid hsl(var(--border))",
+              backgroundColor: "hsl(var(--surface))", color: "hsl(var(--text-main))",
+              outline: "none", fontFamily: "inherit",
             }}
           />
           {searchInput && (
@@ -191,18 +144,9 @@ export default function ProductosClient({
               type="button"
               onClick={clearSearch}
               style={{
-                position: "absolute",
-                right: 8,
-                top: "50%",
-                transform: "translateY(-50%)",
-                background: "transparent",
-                border: "none",
-                cursor: "pointer",
-                padding: 4,
-                color: "hsl(var(--text-muted))",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
+                position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)",
+                background: "transparent", border: "none", cursor: "pointer", padding: 4,
+                color: "hsl(var(--text-muted))", display: "flex", alignItems: "center",
               }}
               aria-label="Limpiar búsqueda"
             >
@@ -211,53 +155,35 @@ export default function ProductosClient({
           )}
         </div>
 
-        {/* Categoria select */}
+        {/* Categoría select */}
         <select
           value={initialCategoria}
           onChange={(e) => handleCategoriaChange(e.target.value)}
           style={{
-            width: 180,
-            padding: "9px 32px 9px 12px",
-            fontSize: 13,
-            borderRadius: 8,
-            border: "1px solid hsl(var(--border))",
-            backgroundColor: "hsl(var(--surface))",
-            color: "hsl(var(--text-main))",
-            outline: "none",
-            appearance: "none",
-            backgroundImage:
-              "url(\"data:image/svg+xml;charset=US-ASCII,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237A7068' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E\")",
-            backgroundRepeat: "no-repeat",
-            backgroundPosition: "right 12px center",
-            cursor: "pointer",
+            width: 180, padding: "9px 32px 9px 12px", fontSize: 13,
+            borderRadius: 8, border: "1px solid hsl(var(--border))",
+            backgroundColor: "hsl(var(--surface))", color: "hsl(var(--text-main))",
+            outline: "none", appearance: "none", cursor: "pointer", fontFamily: "inherit",
+            backgroundImage: "url(\"data:image/svg+xml;charset=US-ASCII,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237A7068' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E\")",
+            backgroundRepeat: "no-repeat", backgroundPosition: "right 12px center",
           }}
         >
           <option value="">Todas las categorías</option>
           {categorias.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.nombre}
-            </option>
+            <option key={c.id} value={c.id}>{c.nombre}</option>
           ))}
         </select>
 
-        {/* Nuevo producto button */}
+        {/* Nuevo Producto */}
         <div style={{ marginLeft: "auto" }}>
           <button
             onClick={openCreate}
             style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "9px 16px",
-              fontSize: 13,
-              fontWeight: 600,
-              color: "white",
-              backgroundColor: "hsl(var(--green))",
-              border: "none",
-              borderRadius: 8,
-              cursor: "pointer",
-              transition: "opacity 0.15s ease",
-              fontFamily: "inherit",
+              display: "flex", alignItems: "center", gap: 8,
+              padding: "9px 16px", fontSize: 13, fontWeight: 600,
+              color: "white", backgroundColor: "hsl(var(--green))",
+              border: "none", borderRadius: 8, cursor: "pointer",
+              fontFamily: "inherit", transition: "opacity 0.15s ease",
             }}
             onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.opacity = "0.9")}
             onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.opacity = "1")}
@@ -268,12 +194,12 @@ export default function ProductosClient({
         </div>
       </div>
 
-      {/* Card container */}
+      {/* Card */}
       <div
         style={{
           backgroundColor: "hsl(var(--surface))",
           borderRadius: 10,
-          boxShadow: "0 2px 8px hsl(var(--shadow))",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
           overflow: "hidden",
           border: "1px solid hsl(var(--border))",
         }}
@@ -283,9 +209,7 @@ export default function ProductosClient({
           style={{
             padding: "14px 20px",
             borderBottom: "1px solid hsl(var(--border))",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
+            display: "flex", alignItems: "center", justifyContent: "space-between",
           }}
         >
           <span style={{ fontSize: 14, fontWeight: 700, color: "hsl(var(--text-main))" }}>
@@ -296,7 +220,7 @@ export default function ProductosClient({
           </span>
         </div>
 
-        {/* Table or empty state */}
+        {/* Table or empty */}
         {productos.length === 0 ? (
           <EmptyState
             hasFilters={Boolean(initialSearch || initialCategoria)}
@@ -324,183 +248,19 @@ export default function ProductosClient({
       </div>
 
       {/* Modal */}
-      {showModal && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 50,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 16,
-            backgroundColor: "rgba(0,0,0,0.4)",
-          }}
-        >
-          <div
-            style={{
-              width: "100%",
-              maxWidth: 480,
-              borderRadius: 12,
-              boxShadow: "0 32px 80px rgba(0,0,0,0.28)",
-              padding: 24,
-              backgroundColor: "hsl(var(--surface))",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                marginBottom: 20,
-              }}
-            >
-              <h2 style={{ fontSize: 17, fontWeight: 700, color: "hsl(var(--text-main))", margin: 0 }}>
-                {editTarget ? "Editar producto" : "Nuevo producto"}
-              </h2>
-              <button
-                onClick={() => setShowModal(false)}
-                style={{
-                  padding: 4,
-                  borderRadius: 6,
-                  border: "none",
-                  background: "transparent",
-                  cursor: "pointer",
-                }}
-              >
-                <X size={18} style={{ color: "hsl(var(--text-muted))" }} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit(onSubmit)} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              <div>
-                <label style={labelStyle}>Nombre</label>
-                <input
-                  {...register("nombre")}
-                  placeholder="Ej: Carne de Res"
-                  style={inputStyle(!!errors.nombre)}
-                />
-                {errors.nombre && <p style={errorStyle}>{errors.nombre.message}</p>}
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <div>
-                  <label style={labelStyle}>Categoría</label>
-                  <select {...register("categoria_id")} style={inputStyle(!!errors.categoria_id)}>
-                    {categorias.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.nombre}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label style={labelStyle}>Unidad</label>
-                  <select {...register("unidad")} style={inputStyle(false)}>
-                    {UNIDADES.map((u) => (
-                      <option key={u} value={u}>
-                        {u}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <div>
-                  <label style={labelStyle}>Stock mínimo</label>
-                  <input
-                    {...register("stock_minimo", { valueAsNumber: true })}
-                    type="number"
-                    min={0}
-                    style={inputStyle(!!errors.stock_minimo)}
-                  />
-                </div>
-                <div>
-                  <label style={labelStyle}>Precio (MXN)</label>
-                  <input
-                    {...register("last_price", { valueAsNumber: true })}
-                    type="number"
-                    step="0.01"
-                    min={0}
-                    style={inputStyle(!!errors.last_price)}
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: "flex", gap: 12, paddingTop: 8 }}>
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  style={{
-                    flex: 1,
-                    padding: "9px 16px",
-                    fontSize: 13,
-                    fontWeight: 600,
-                    borderRadius: 8,
-                    border: "1px solid hsl(var(--border))",
-                    backgroundColor: "transparent",
-                    color: "hsl(var(--text-sub))",
-                    cursor: "pointer",
-                    fontFamily: "inherit",
-                  }}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={isPending}
-                  style={{
-                    flex: 1,
-                    padding: "9px 16px",
-                    fontSize: 13,
-                    fontWeight: 600,
-                    borderRadius: 8,
-                    border: "none",
-                    backgroundColor: "hsl(var(--green))",
-                    color: "white",
-                    cursor: isPending ? "wait" : "pointer",
-                    opacity: isPending ? 0.6 : 1,
-                    fontFamily: "inherit",
-                  }}
-                >
-                  {isPending ? "Guardando..." : editTarget ? "Actualizar" : "Crear"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <ProductoModal
+        open={showModal}
+        editTarget={editTarget}
+        categorias={categorias}
+        onClose={() => setShowModal(false)}
+        onSuccess={() => {
+          setShowModal(false);
+          router.refresh();
+        }}
+        onCategoriaCreated={(newCat) => {
+          setCategorias((prev) => [...prev, newCat].sort((a, b) => a.nombre.localeCompare(b.nombre)));
+        }}
+      />
     </div>
   );
 }
-
-const labelStyle: React.CSSProperties = {
-  display: "block",
-  fontSize: 11,
-  fontWeight: 600,
-  textTransform: "uppercase",
-  letterSpacing: "0.04em",
-  color: "hsl(var(--text-sub))",
-  marginBottom: 6,
-};
-
-function inputStyle(hasError: boolean): React.CSSProperties {
-  return {
-    width: "100%",
-    padding: "9px 12px",
-    fontSize: 13,
-    borderRadius: 8,
-    border: `1px solid ${hasError ? "#BA3026" : "hsl(var(--border))"}`,
-    backgroundColor: "hsl(var(--bg))",
-    color: "hsl(var(--text-main))",
-    outline: "none",
-    fontFamily: "inherit",
-  };
-}
-
-const errorStyle: React.CSSProperties = {
-  fontSize: 11,
-  marginTop: 4,
-  color: "#BA3026",
-};
