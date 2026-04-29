@@ -1,0 +1,301 @@
+"use client";
+
+import { useMemo } from "react";
+import {
+  flexRender,
+  getCoreRowModel,
+  useReactTable,
+  type ColumnDef,
+} from "@tanstack/react-table";
+import { Package, Pencil, Trash2 } from "lucide-react";
+import { formatCurrency, getStockEstado } from "@/lib/format";
+import type { Producto, Categoria } from "@/types";
+
+interface ProductosTableProps {
+  productos: Producto[];
+  categorias: Categoria[];
+  onEdit: (p: Producto) => void;
+  onDelete: (p: Producto) => void;
+}
+
+export function ProductosTable({ productos, categorias, onEdit, onDelete }: ProductosTableProps) {
+  const catMap = useMemo(() => {
+    const m = new Map<string, Categoria>();
+    categorias.forEach((c) => m.set(c.id, c));
+    return m;
+  }, [categorias]);
+
+  const columns = useMemo<ColumnDef<Producto>[]>(
+    () => [
+      {
+        id: "producto",
+        header: "Producto",
+        cell: ({ row }) => {
+          const p = row.original;
+          const cat = catMap.get(p.categoria_id);
+          const color = cat?.color ?? "#78909C";
+          return (
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 8,
+                  background: `${color}22`,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}
+              >
+                <Package size={16} style={{ color }} />
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontWeight: 600, fontSize: 13, color: "hsl(var(--text-main))" }}>
+                  {p.nombre}
+                </div>
+                <div style={{ fontSize: 11, color: "hsl(var(--text-muted))" }}>{p.unidad}</div>
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        id: "categoria",
+        header: "Categoría",
+        cell: ({ row }) => {
+          const p = row.original;
+          const cat = catMap.get(p.categoria_id);
+          const color = cat?.color ?? "#78909C";
+          const nombre = cat?.nombre ?? "-";
+          return (
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                fontSize: 11,
+                fontWeight: 600,
+                padding: "2px 10px",
+                borderRadius: 99,
+                backgroundColor: `${color}22`,
+                color,
+                whiteSpace: "nowrap",
+              }}
+            >
+              {nombre}
+            </span>
+          );
+        },
+      },
+      {
+        id: "stock",
+        header: "Stock Actual",
+        meta: { align: "center" as const },
+        cell: ({ row }) => {
+          const p = row.original;
+          const estado = getStockEstado(p.stock_actual, p.stock_minimo);
+          const color =
+            estado === "critico"
+              ? "hsl(var(--terracota))"
+              : estado === "bajo"
+                ? "hsl(var(--gold))"
+                : "hsl(var(--green))";
+          return (
+            <span
+              style={{
+                fontWeight: 700,
+                fontSize: 14,
+                fontVariantNumeric: "tabular-nums",
+                color,
+              }}
+            >
+              {p.stock_actual}{" "}
+              <span style={{ fontSize: 11, fontWeight: 400, color: "hsl(var(--text-muted))" }}>
+                {p.unidad}
+              </span>
+            </span>
+          );
+        },
+      },
+      {
+        id: "stock_minimo",
+        header: "Stock Mínimo",
+        meta: { align: "center" as const },
+        cell: ({ row }) => {
+          const p = row.original;
+          return (
+            <span style={{ fontSize: 13, color: "hsl(var(--text-sub))", fontVariantNumeric: "tabular-nums" }}>
+              {p.stock_minimo} {p.unidad}
+            </span>
+          );
+        },
+      },
+      {
+        id: "precio",
+        header: "Último Precio",
+        meta: { align: "right" as const },
+        cell: ({ row }) => {
+          const p = row.original;
+          return (
+            <span style={{ fontWeight: 600, fontSize: 13, color: "hsl(var(--text-main))", fontVariantNumeric: "tabular-nums" }}>
+              {formatCurrency(p.last_price)} <span style={{ color: "hsl(var(--text-muted))", fontWeight: 400 }}>/ {p.unidad}</span>
+            </span>
+          );
+        },
+      },
+      {
+        id: "acciones",
+        header: "Acciones",
+        meta: { align: "center" as const },
+        cell: ({ row }) => {
+          const p = row.original;
+          return (
+            <div style={{ display: "flex", gap: 6, justifyContent: "center" }}>
+              <ActionBtn
+                varName="navy"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit(p);
+                }}
+                title="Editar"
+              >
+                <Pencil size={14} />
+              </ActionBtn>
+              <ActionBtn
+                varName="terracota"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(p);
+                }}
+                title="Eliminar"
+              >
+                <Trash2 size={14} />
+              </ActionBtn>
+            </div>
+          );
+        },
+      },
+    ],
+    [catMap, onEdit, onDelete],
+  );
+
+  const table = useReactTable({
+    data: productos,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+  });
+
+  return (
+    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+      <thead>
+        {table.getHeaderGroups().map((hg) => (
+          <tr
+            key={hg.id}
+            style={{
+              backgroundColor: "hsl(var(--surface-alt))",
+              borderBottom: "1px solid hsl(var(--border))",
+            }}
+          >
+            {hg.headers.map((h) => {
+              const align = (h.column.columnDef.meta as { align?: "left" | "center" | "right" } | undefined)?.align ?? "left";
+              return (
+                <th
+                  key={h.id}
+                  style={{
+                    padding: "12px 16px",
+                    textAlign: align,
+                    fontWeight: 600,
+                    textTransform: "uppercase",
+                    fontSize: 11,
+                    letterSpacing: "0.06em",
+                    color: "hsl(var(--text-sub))",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {flexRender(h.column.columnDef.header, h.getContext())}
+                </th>
+              );
+            })}
+          </tr>
+        ))}
+      </thead>
+      <tbody>
+        {table.getRowModel().rows.map((row, i) => (
+          <tr
+            key={row.id}
+            style={{
+              backgroundColor: i % 2 === 0 ? "hsl(var(--surface))" : "hsl(var(--surface-alt))",
+              borderBottom: "1px solid hsl(var(--border))",
+              transition: "background-color 0.1s ease",
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLTableRowElement).style.backgroundColor = "hsl(var(--surface-hover))";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLTableRowElement).style.backgroundColor =
+                i % 2 === 0 ? "hsl(var(--surface))" : "hsl(var(--surface-alt))";
+            }}
+          >
+            {row.getVisibleCells().map((cell) => {
+              const align = (cell.column.columnDef.meta as { align?: "left" | "center" | "right" } | undefined)?.align ?? "left";
+              return (
+                <td
+                  key={cell.id}
+                  style={{
+                    padding: "14px 16px",
+                    textAlign: align,
+                    verticalAlign: "middle",
+                  }}
+                >
+                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                </td>
+              );
+            })}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function ActionBtn({
+  children,
+  varName,
+  onClick,
+  title,
+}: {
+  children: React.ReactNode;
+  varName: "navy" | "terracota";
+  onClick: (e: React.MouseEvent) => void;
+  title: string;
+}) {
+  const color = `hsl(var(--${varName}))`;
+  const bgIdle = `hsl(var(--${varName}) / 0.12)`;
+  const bgHover = `hsl(var(--${varName}) / 0.22)`;
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      style={{
+        background: bgIdle,
+        border: "none",
+        borderRadius: 6,
+        padding: "6px 10px",
+        cursor: "pointer",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color,
+        transition: "background-color 0.15s ease",
+      }}
+      onMouseEnter={(e) => {
+        (e.currentTarget as HTMLButtonElement).style.background = bgHover;
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLButtonElement).style.background = bgIdle;
+      }}
+    >
+      {children}
+    </button>
+  );
+}

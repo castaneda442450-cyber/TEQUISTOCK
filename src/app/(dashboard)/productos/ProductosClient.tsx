@@ -5,12 +5,14 @@ import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Search, X } from "lucide-react";
+import { Plus, Search, X } from "lucide-react";
 import { productoSchema, type ProductoInput } from "@/lib/schemas/producto.schema";
 import { createProducto, updateProducto, deleteProducto } from "@/lib/actions/productos.actions";
-import { formatCurrency, getStockEstado } from "@/lib/format";
 import { UNIDADES } from "@/lib/constants";
 import type { Producto, Categoria } from "@/types";
+import { ProductosTable } from "@/components/productos/ProductosTable";
+import { Pagination } from "@/components/productos/Pagination";
+import { EmptyState } from "@/components/productos/EmptyState";
 
 interface Props {
   productos: Producto[];
@@ -25,6 +27,8 @@ interface Props {
 export default function ProductosClient({
   productos,
   count,
+  totalPages,
+  currentPage,
   categorias,
   initialSearch,
   initialCategoria,
@@ -81,6 +85,13 @@ export default function ProductosClient({
     updateUrlParams({ search: null, page: null });
   }
 
+  function handlePageChange(page: number) {
+    updateUrlParams({ page: page > 1 ? String(page) : null });
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }
+
   const {
     register,
     handleSubmit,
@@ -134,15 +145,6 @@ export default function ProductosClient({
       router.refresh();
     });
   }
-
-  const catColor = (catId: string) => {
-    const cat = categorias.find((c) => c.id === catId);
-    return cat?.color ?? "#78909C";
-  };
-  const catNombre = (p: Producto) =>
-    (p.categoria as Categoria | undefined)?.nombre ??
-    categorias.find((c) => c.id === p.categoria_id)?.nombre ??
-    "-";
 
   return (
     <div style={{ padding: 28 }}>
@@ -294,171 +296,31 @@ export default function ProductosClient({
           </span>
         </div>
 
-        {/* Table */}
-        <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
-          <thead>
-            <tr
-              style={{
-                backgroundColor: "hsl(var(--surface-alt))",
-                borderBottom: "1px solid hsl(var(--border))",
-              }}
-            >
-              {["Nombre", "Categoría", "Stock", "Mínimo", "Precio", "Acciones"].map((h) => (
-                <th
-                  key={h}
-                  style={{
-                    padding: "12px 16px",
-                    textAlign: "left",
-                    fontWeight: 600,
-                    textTransform: "uppercase",
-                    fontSize: 11,
-                    letterSpacing: "0.04em",
-                    color: "hsl(var(--text-sub))",
-                  }}
-                >
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {productos.map((p, i) => {
-              const estado = getStockEstado(p.stock_actual, p.stock_minimo);
-              const color = catColor(p.categoria_id);
-              return (
-                <tr
-                  key={p.id}
-                  style={{
-                    backgroundColor:
-                      i % 2 === 0 ? "hsl(var(--surface))" : "hsl(var(--surface-alt))",
-                    borderBottom: "1px solid hsl(var(--border))",
-                  }}
-                >
-                  <td
-                    style={{
-                      padding: "12px 16px",
-                      fontWeight: 500,
-                      color: "hsl(var(--text-main))",
-                    }}
-                  >
-                    {p.nombre}
-                  </td>
-                  <td style={{ padding: "12px 16px" }}>
-                    <span
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 600,
-                        padding: "2px 10px",
-                        borderRadius: 99,
-                        backgroundColor: color + "22",
-                        color,
-                      }}
-                    >
-                      {catNombre(p)}
-                    </span>
-                  </td>
-                  <td style={{ padding: "12px 16px" }}>
-                    <span
-                      style={{
-                        fontWeight: 600,
-                        fontVariantNumeric: "tabular-nums",
-                        fontSize: 12,
-                        padding: "2px 8px",
-                        borderRadius: 99,
-                        backgroundColor:
-                          estado === "critico"
-                            ? "#BA302622"
-                            : estado === "bajo"
-                              ? "#C2972E22"
-                              : "#10665322",
-                        color:
-                          estado === "critico"
-                            ? "#BA3026"
-                            : estado === "bajo"
-                              ? "#C2972E"
-                              : "#106653",
-                      }}
-                    >
-                      {p.stock_actual} {p.unidad}
-                    </span>
-                  </td>
-                  <td
-                    style={{
-                      padding: "12px 16px",
-                      fontVariantNumeric: "tabular-nums",
-                      color: "hsl(var(--text-sub))",
-                    }}
-                  >
-                    {p.stock_minimo} {p.unidad}
-                  </td>
-                  <td
-                    style={{
-                      padding: "12px 16px",
-                      fontVariantNumeric: "tabular-nums",
-                      fontWeight: 500,
-                      color: "hsl(var(--text-main))",
-                    }}
-                  >
-                    {formatCurrency(p.last_price)}
-                  </td>
-                  <td style={{ padding: "12px 16px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <button
-                        onClick={() => openEdit(p)}
-                        style={{
-                          padding: 6,
-                          borderRadius: 6,
-                          border: "none",
-                          background: "transparent",
-                          cursor: "pointer",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                        title="Editar"
-                      >
-                        <Pencil size={14} style={{ color: "hsl(var(--text-sub))" }} />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(p)}
-                        style={{
-                          padding: 6,
-                          borderRadius: 6,
-                          border: "none",
-                          background: "transparent",
-                          cursor: "pointer",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                        title="Eliminar"
-                      >
-                        <Trash2 size={14} style={{ color: "#BA3026" }} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-            {productos.length === 0 && (
-              <tr>
-                <td
-                  colSpan={6}
-                  style={{
-                    padding: "48px 16px",
-                    textAlign: "center",
-                    fontSize: 13,
-                    color: "hsl(var(--text-muted))",
-                  }}
-                >
-                  {initialSearch || initialCategoria
-                    ? "No se encontraron productos con esos filtros"
-                    : "No hay productos registrados"}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+        {/* Table or empty state */}
+        {productos.length === 0 ? (
+          <EmptyState
+            hasFilters={Boolean(initialSearch || initialCategoria)}
+            onCreate={openCreate}
+          />
+        ) : (
+          <ProductosTable
+            productos={productos}
+            categorias={categorias}
+            onEdit={openEdit}
+            onDelete={handleDelete}
+          />
+        )}
+
+        {/* Pagination */}
+        {productos.length > 0 && (
+          <div style={{ padding: "0 16px", borderTop: "1px solid hsl(var(--border))" }}>
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={handlePageChange}
+            />
+          </div>
+        )}
       </div>
 
       {/* Modal */}
