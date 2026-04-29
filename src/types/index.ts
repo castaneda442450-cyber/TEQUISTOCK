@@ -32,6 +32,10 @@ export interface Proveedor {
   total_spent: number;
   activo: boolean;
   created_at: string;
+  // computed from joins
+  productos_count: number;
+  compras_count: number;
+  producto_ids: string[];
 }
 
 export interface ProveedorProducto {

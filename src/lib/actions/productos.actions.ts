@@ -83,6 +83,13 @@ export async function createProducto(
   const parsed = productoSchema.safeParse(input);
   if (!parsed.success) return { data: null, error: "Datos inválidos" };
 
+  const { count } = await sb()
+    .from("productos")
+    .select("id", { count: "exact", head: true })
+    .ilike("nombre", parsed.data.nombre);
+  if (count && count > 0)
+    return { data: null, error: `Ya existe un producto con el nombre "${parsed.data.nombre}"` };
+
   const { data, error } = await sb()
     .from("productos")
     .insert({ ...parsed.data, stock_actual: 0 })
@@ -133,6 +140,18 @@ export async function deleteProducto(
   return { error: null };
 }
 
+export async function getAllProductos(): Promise<{
+  data: Producto[];
+  error: string | null;
+}> {
+  const { data, error } = await sb()
+    .from("productos")
+    .select("*, categorias:categoria_id(id,nombre,color)")
+    .order("nombre");
+  if (error) return { data: [], error: error.message };
+  return { data: (data ?? []) as unknown as Producto[], error: null };
+}
+
 export async function getCategorias() {
   const { data, error } = await sb()
     .from("categorias")
@@ -174,4 +193,28 @@ export async function createCategoria(
 
   revalidatePath("/productos");
   return { data, error: null };
+}
+
+export async function deleteCategoria(
+  id: string,
+): Promise<{ error: string | null }> {
+  const supabase = sb();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "No autorizado" };
+
+  // Verificar que no haya productos usando esta categoría
+  const { count } = await supabase
+    .from("productos")
+    .select("id", { count: "exact", head: true })
+    .eq("categoria_id", id);
+
+  if (count && count > 0) {
+    return { error: `No se puede eliminar: ${count} producto(s) usan esta categoría` };
+  }
+
+  const { error } = await supabase.from("categorias").delete().eq("id", id);
+  if (error) return { error: error.message };
+
+  revalidatePath("/productos");
+  return { error: null };
 }

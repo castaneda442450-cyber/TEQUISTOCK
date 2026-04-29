@@ -1,17 +1,26 @@
 import { getProveedores } from "@/lib/actions/proveedores.actions";
-import { getProductos } from "@/lib/actions/productos.actions";
+import { getAllProductos } from "@/lib/actions/productos.actions";
 import ProveedoresClient from "./ProveedoresClient";
 
-export default async function ProveedoresPage() {
+interface ProveedoresPageProps {
+  searchParams: Promise<{
+    search?: string;
+  }>;
+}
+
+export default async function ProveedoresPage({ searchParams }: ProveedoresPageProps) {
+  const params = await searchParams;
+
   const [{ data: proveedores }, { data: productos }] = await Promise.all([
-    getProveedores(),
-    getProductos(),
+    getProveedores(params.search),
+    getAllProductos(),
   ]);
 
   return (
     <ProveedoresClient
       proveedores={proveedores ?? []}
       productos={productos ?? []}
+      initialSearch={params.search ?? ""}
     />
   );
 }

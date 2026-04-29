@@ -1,245 +1,516 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { useState, useTransition, useEffect, useRef } from "react";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, X, Search } from "lucide-react";
-import { proveedorSchema, type ProveedorInput } from "@/lib/schemas/proveedor.schema";
-import { createProveedor, updateProveedor, toggleActivo, deleteProveedor } from "@/lib/actions/proveedores.actions";
+import { Plus, Search, X, Users, Mail, Phone, Pencil, Trash2 } from "lucide-react";
+import { deleteProveedor } from "@/lib/actions/proveedores.actions";
 import { formatCurrency } from "@/lib/format";
 import type { Proveedor, Producto } from "@/types";
+import { ProveedorModal } from "@/components/proveedores/ProveedorModal";
+import { ProveedorDetailModal } from "@/components/proveedores/ProveedorDetailModal";
+import { DeleteConfirmModal } from "@/components/proveedores/DeleteConfirmModal";
 
 interface Props {
   proveedores: Proveedor[];
   productos: Producto[];
+  initialSearch: string;
 }
 
-export default function ProveedoresClient({ proveedores: initial, productos }: Props) {
-  const [proveedores, setProveedores] = useState(initial);
-  const [search, setSearch] = useState("");
-  const [showModal, setShowModal] = useState(false);
-  const [editTarget, setEditTarget] = useState<Proveedor | null>(null);
-  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
-  const [isPending, startTransition] = useTransition();
+export default function ProveedoresClient({
+  proveedores: initialProveedores,
+  productos,
+  initialSearch,
+}: Props) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
-  const filtered = proveedores.filter((p) =>
-    p.company.toLowerCase().includes(search.toLowerCase()) ||
-    p.contact.toLowerCase().includes(search.toLowerCase()),
-  );
+  const [proveedores, setProveedores] = useState<Proveedor[]>(initialProveedores);
+  const [searchInput, setSearchInput] = useState(initialSearch);
+  const [showModal, setShowModal] = useState<null | "create" | "edit" | "detail" | "delete">(null);
+  const [selectedProveedor, setSelectedProveedor] = useState<Proveedor | null>(null);
+  const [, startNavTransition] = useTransition();
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<ProveedorInput>({
-    resolver: zodResolver(proveedorSchema),
-  });
+  useEffect(() => {
+    setProveedores(initialProveedores);
+  }, [initialProveedores]);
+
+  useEffect(() => {
+    setSearchInput(initialSearch);
+  }, [initialSearch]);
+
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (searchInput === initialSearch) return;
+
+    debounceRef.current = setTimeout(() => {
+      updateUrlParams({ search: searchInput || null });
+    }, 300);
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchInput]);
+
+  function updateUrlParams(updates: Record<string, string | null>) {
+    const params = new URLSearchParams(searchParams.toString());
+    for (const [key, value] of Object.entries(updates)) {
+      if (value === null || value === "") params.delete(key);
+      else params.set(key, value);
+    }
+    const qs = params.toString();
+    startNavTransition(() => {
+      router.push(`${pathname}${qs ? `?${qs}` : ""}`);
+    });
+  }
+
+  function clearSearch() {
+    setSearchInput("");
+    updateUrlParams({ search: null });
+  }
 
   function openCreate() {
-    setEditTarget(null);
-    setSelectedProductIds([]);
-    reset({ company: "", contact: "", email: "", phone: "", address: "" });
-    setShowModal(true);
+    setSelectedProveedor(null);
+    setShowModal("create");
   }
 
   function openEdit(p: Proveedor) {
-    setEditTarget(p);
-    setSelectedProductIds([]);
-    reset({ company: p.company, contact: p.contact, email: p.email ?? "", phone: p.phone ?? "", address: p.address ?? "" });
-    setShowModal(true);
+    setSelectedProveedor(p);
+    setShowModal("edit");
   }
 
-  function toggleProductSelect(id: string) {
-    setSelectedProductIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-    );
+  function openDetail(p: Proveedor) {
+    setSelectedProveedor(p);
+    setShowModal("detail");
   }
 
-  function onSubmit(data: ProveedorInput) {
-    startTransition(async () => {
-      if (editTarget) {
-        const res = await updateProveedor(editTarget.id, data, selectedProductIds);
-        if (res.error) { toast.error(res.error); return; }
-        setProveedores((prev) => prev.map((p) => (p.id === editTarget.id ? { ...p, ...data } : p)));
-        toast.success("Proveedor actualizado");
-      } else {
-        const res = await createProveedor(data, selectedProductIds);
-        if (res.error) { toast.error(res.error); return; }
-        if (res.data) setProveedores((prev) => [...prev, res.data!]);
-        toast.success("Proveedor creado");
-      }
-      setShowModal(false);
-    });
+  function openDelete(p: Proveedor) {
+    setSelectedProveedor(p);
+    setShowModal("delete");
   }
 
-  function handleToggle(p: Proveedor) {
-    startTransition(async () => {
-      const res = await toggleActivo(p.id);
+  function handleModalSuccess(saved: Proveedor) {
+    if (showModal === "edit") {
+      setProveedores((prev) => prev.map((x) => (x.id === saved.id ? saved : x)));
+    } else {
+      setProveedores((prev) => [...prev, saved]);
+    }
+  }
+
+  function confirmDelete() {
+    if (!selectedProveedor) return;
+    deleteProveedor(selectedProveedor.id).then((res) => {
       if (res.error) { toast.error(res.error); return; }
-      setProveedores((prev) => prev.map((x) => (x.id === p.id ? { ...x, activo: !x.activo } : x)));
-    });
-  }
-
-  function handleDelete(p: Proveedor) {
-    if (!confirm(`¿Eliminar "${p.company}"?`)) return;
-    startTransition(async () => {
-      const res = await deleteProveedor(p.id);
-      if (res.error) { toast.error(res.error); return; }
-      setProveedores((prev) => prev.filter((x) => x.id !== p.id));
       toast.success("Proveedor eliminado");
+      setProveedores((prev) => prev.filter((x) => x.id !== selectedProveedor.id));
+      setShowModal(null);
+      setSelectedProveedor(null);
     });
   }
 
   return (
-    <div className="p-6 space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold" style={{ color: "hsl(var(--text-main))" }}>Proveedores</h1>
-          <p className="text-sm mt-0.5" style={{ color: "hsl(var(--text-sub))" }}>{proveedores.length} proveedores registrados</p>
+    <div style={{ padding: 28 }}>
+      {/* Header */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 14,
+          marginBottom: 22,
+        }}
+      >
+        {/* Search */}
+        <div style={{ position: "relative", width: 240, flexShrink: 0 }}>
+          <Search
+            size={15}
+            style={{
+              position: "absolute",
+              left: 12,
+              top: "50%",
+              transform: "translateY(-50%)",
+              color: "hsl(var(--text-muted))",
+              pointerEvents: "none",
+            }}
+          />
+          <input
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Buscar proveedor..."
+            style={{
+              width: "100%",
+              padding: "9px 32px 9px 36px",
+              fontSize: 13,
+              borderRadius: 8,
+              border: "1px solid hsl(var(--border))",
+              backgroundColor: "hsl(var(--surface))",
+              color: "hsl(var(--text-main))",
+              outline: "none",
+              fontFamily: "inherit",
+              boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+              boxSizing: "border-box",
+            }}
+          />
+          {searchInput && (
+            <button
+              type="button"
+              onClick={clearSearch}
+              style={{
+                position: "absolute",
+                right: 8,
+                top: "50%",
+                transform: "translateY(-50%)",
+                background: "transparent",
+                border: "none",
+                cursor: "pointer",
+                padding: 4,
+                color: "hsl(var(--text-muted))",
+                display: "flex",
+                alignItems: "center",
+              }}
+              aria-label="Limpiar búsqueda"
+            >
+              <X size={13} />
+            </button>
+          )}
         </div>
+
+        {/* Nuevo Proveedor */}
         <button
           onClick={openCreate}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white"
-          style={{ backgroundColor: "hsl(var(--terracota))" }}
+          style={{
+            marginLeft: "auto",
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "9px 16px",
+            fontSize: 13,
+            fontWeight: 600,
+            color: "white",
+            backgroundColor: "hsl(var(--green))",
+            border: "none",
+            borderRadius: 8,
+            cursor: "pointer",
+            fontFamily: "inherit",
+            transition: "opacity 0.15s ease",
+            flexShrink: 0,
+          }}
+          onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.opacity = "0.9")}
+          onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.opacity = "1")}
         >
-          <Plus size={16} /> Nuevo proveedor
+          <Plus size={15} />
+          Nuevo Proveedor
         </button>
       </div>
 
-      <div className="relative max-w-xs">
-        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "hsl(var(--text-muted))" }} />
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Buscar proveedor..."
-          className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border outline-none"
-          style={{ backgroundColor: "hsl(var(--surface))", borderColor: "hsl(var(--border))", color: "hsl(var(--text-main))" }}
-        />
-      </div>
-
-      <div className="rounded-xl border overflow-hidden" style={{ borderColor: "hsl(var(--border))", backgroundColor: "hsl(var(--surface))" }}>
-        <table className="w-full text-sm">
-          <thead>
-            <tr style={{ backgroundColor: "hsl(var(--surface-alt))", borderBottom: "1px solid hsl(var(--border))" }}>
-              {["Empresa", "Contacto", "Email", "Teléfono", "Total compras", "Estado", "Acciones"].map((h) => (
-                <th key={h} className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide" style={{ color: "hsl(var(--text-sub))" }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((p, i) => (
-              <tr key={p.id} style={{ backgroundColor: i % 2 === 0 ? "hsl(var(--surface))" : "hsl(var(--surface-alt))", borderBottom: "1px solid hsl(var(--border))" }}>
-                <td className="px-4 py-3 font-semibold" style={{ color: "hsl(var(--text-main))" }}>{p.company}</td>
-                <td className="px-4 py-3" style={{ color: "hsl(var(--text-sub))" }}>{p.contact}</td>
-                <td className="px-4 py-3" style={{ color: "hsl(var(--text-sub))" }}>{p.email ?? "-"}</td>
-                <td className="px-4 py-3" style={{ color: "hsl(var(--text-sub))" }}>{p.phone ?? "-"}</td>
-                <td className="px-4 py-3 tabular-nums font-medium" style={{ color: "hsl(var(--text-main))" }}>{formatCurrency(p.total_spent)}</td>
-                <td className="px-4 py-3">
-                  <button onClick={() => handleToggle(p)} className="flex items-center gap-1.5">
-                    {p.activo
-                      ? <ToggleRight size={20} style={{ color: "#106653" }} />
-                      : <ToggleLeft size={20} style={{ color: "hsl(var(--text-muted))" }} />}
-                    <span className="text-xs font-medium" style={{ color: p.activo ? "#106653" : "hsl(var(--text-muted))" }}>
-                      {p.activo ? "Activo" : "Inactivo"}
-                    </span>
-                  </button>
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <button onClick={() => openEdit(p)} className="p-1.5 rounded-md hover:bg-black/5">
-                      <Pencil size={14} style={{ color: "hsl(var(--text-sub))" }} />
-                    </button>
-                    <button onClick={() => handleDelete(p)} className="p-1.5 rounded-md hover:bg-red-50">
-                      <Trash2 size={14} style={{ color: "#BA3026" }} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {filtered.length === 0 && (
-              <tr>
-                <td colSpan={7} className="px-4 py-12 text-center text-sm" style={{ color: "hsl(var(--text-muted))" }}>
-                  No hay proveedores registrados
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }}>
-          <div className="w-full max-w-lg rounded-xl shadow-2xl p-6" style={{ backgroundColor: "hsl(var(--surface))" }}>
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-bold" style={{ color: "hsl(var(--text-main))" }}>
-                {editTarget ? "Editar proveedor" : "Nuevo proveedor"}
-              </h2>
-              <button onClick={() => setShowModal(false)} className="p-1 rounded hover:bg-black/5">
-                <X size={18} style={{ color: "hsl(var(--text-muted))" }} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide" style={{ color: "hsl(var(--text-sub))" }}>Empresa</label>
-                  <input {...register("company")} placeholder="Nombre empresa" className="w-full px-3 py-2 rounded-lg border text-sm outline-none" style={{ borderColor: errors.company ? "#BA3026" : "hsl(var(--border))", backgroundColor: "hsl(var(--bg))", color: "hsl(var(--text-main))" }} />
-                  {errors.company && <p className="text-xs mt-1" style={{ color: "#BA3026" }}>{errors.company.message}</p>}
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide" style={{ color: "hsl(var(--text-sub))" }}>Contacto</label>
-                  <input {...register("contact")} placeholder="Nombre contacto" className="w-full px-3 py-2 rounded-lg border text-sm outline-none" style={{ borderColor: errors.contact ? "#BA3026" : "hsl(var(--border))", backgroundColor: "hsl(var(--bg))", color: "hsl(var(--text-main))" }} />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide" style={{ color: "hsl(var(--text-sub))" }}>Email</label>
-                  <input {...register("email")} type="email" placeholder="correo@empresa.mx" className="w-full px-3 py-2 rounded-lg border text-sm outline-none" style={{ borderColor: "hsl(var(--border))", backgroundColor: "hsl(var(--bg))", color: "hsl(var(--text-main))" }} />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide" style={{ color: "hsl(var(--text-sub))" }}>Teléfono</label>
-                  <input {...register("phone")} placeholder="+52 55 0000 0000" className="w-full px-3 py-2 rounded-lg border text-sm outline-none" style={{ borderColor: "hsl(var(--border))", backgroundColor: "hsl(var(--bg))", color: "hsl(var(--text-main))" }} />
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide" style={{ color: "hsl(var(--text-sub))" }}>Dirección</label>
-                <input {...register("address")} placeholder="Calle, colonia, ciudad" className="w-full px-3 py-2 rounded-lg border text-sm outline-none" style={{ borderColor: "hsl(var(--border))", backgroundColor: "hsl(var(--bg))", color: "hsl(var(--text-main))" }} />
-              </div>
-
-              {/* Product multiselect */}
-              <div>
-                <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide" style={{ color: "hsl(var(--text-sub))" }}>Productos que suministra (opcional)</label>
-                <div className="max-h-32 overflow-y-auto rounded-lg border p-2 flex flex-wrap gap-1.5" style={{ borderColor: "hsl(var(--border))", backgroundColor: "hsl(var(--bg))" }}>
-                  {productos.map((p) => {
-                    const sel = selectedProductIds.includes(p.id);
-                    return (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => toggleProductSelect(p.id)}
-                        className="text-xs px-2.5 py-1 rounded-full border font-medium transition-all"
-                        style={{
-                          backgroundColor: sel ? "hsl(var(--terracota))" : "transparent",
-                          color: sel ? "white" : "hsl(var(--text-sub))",
-                          borderColor: sel ? "hsl(var(--terracota))" : "hsl(var(--border))",
-                        }}
-                      >
-                        {p.nombre}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-2 rounded-lg text-sm font-semibold border" style={{ borderColor: "hsl(var(--border))", color: "hsl(var(--text-sub))" }}>
-                  Cancelar
-                </button>
-                <button type="submit" disabled={isPending} className="flex-1 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-60" style={{ backgroundColor: "hsl(var(--terracota))" }}>
-                  {isPending ? "Guardando..." : editTarget ? "Actualizar" : "Crear proveedor"}
-                </button>
-              </div>
-            </form>
-          </div>
+      {/* Grid or Empty State */}
+      {proveedores.length === 0 ? (
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "60px 20px",
+            gap: 12,
+          }}
+        >
+          <Users size={40} style={{ color: "hsl(var(--border-strong))" }} />
+          <p style={{ fontSize: 14, color: "hsl(var(--text-muted))", margin: 0 }}>
+            No se encontraron proveedores
+          </p>
+        </div>
+      ) : (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, 1fr)",
+            gap: 16,
+          }}
+        >
+          {proveedores.map((proveedor) => (
+            <SupplierCard
+              key={proveedor.id}
+              proveedor={proveedor}
+              onEdit={() => openEdit(proveedor)}
+              onDelete={() => openDelete(proveedor)}
+              onDetail={() => openDetail(proveedor)}
+            />
+          ))}
         </div>
       )}
+
+      {/* Modals */}
+      <ProveedorModal
+        open={showModal === "create" || showModal === "edit"}
+        editTarget={showModal === "edit" ? selectedProveedor : null}
+        productos={productos}
+        onClose={() => { setShowModal(null); setSelectedProveedor(null); }}
+        onSuccess={(saved) => {
+          handleModalSuccess(saved);
+          setShowModal(null);
+          setSelectedProveedor(null);
+        }}
+      />
+
+      <ProveedorDetailModal
+        proveedor={showModal === "detail" ? selectedProveedor : null}
+        productos={productos}
+        onClose={() => { setShowModal(null); setSelectedProveedor(null); }}
+      />
+
+      <DeleteConfirmModal
+        proveedor={showModal === "delete" ? selectedProveedor : null}
+        onConfirm={confirmDelete}
+        onCancel={() => { setShowModal(null); setSelectedProveedor(null); }}
+      />
     </div>
+  );
+}
+
+// ─── SupplierCard ─────────────────────────────────────────────────────────────
+
+interface SupplierCardProps {
+  proveedor: Proveedor;
+  onEdit: () => void;
+  onDelete: () => void;
+  onDetail: () => void;
+}
+
+function SupplierCard({ proveedor, onEdit, onDelete, onDetail }: SupplierCardProps) {
+  const [hovered, setHovered] = useState(false);
+
+  return (
+    <div
+      style={{
+        backgroundColor: "hsl(var(--surface))",
+        borderRadius: 10,
+        boxShadow: hovered
+          ? "0 6px 20px rgba(0,0,0,0.10)"
+          : "0 2px 8px rgba(0,0,0,0.06)",
+        padding: 22,
+        border: "1px solid hsl(var(--border))",
+        display: "flex",
+        flexDirection: "column",
+        gap: 12,
+        cursor: "pointer",
+        transform: hovered ? "translateY(-2px)" : "translateY(0)",
+        transition: "transform 0.15s ease, box-shadow 0.15s ease",
+      }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onClick={onDetail}
+    >
+      {/* Top row: icon + action buttons */}
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+        <div
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: 10,
+            backgroundColor: "hsl(var(--navy) / 0.12)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+          }}
+        >
+          <Users size={20} style={{ color: "hsl(var(--navy))" }} />
+        </div>
+
+        <div
+          style={{ display: "flex", gap: 4 }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <ActionBtn onClick={onEdit} title="Editar proveedor" color="hsl(var(--navy))">
+            <Pencil size={13} />
+          </ActionBtn>
+          <ActionBtn onClick={onDelete} title="Eliminar proveedor" color="hsl(var(--terracota))">
+            <Trash2 size={13} />
+          </ActionBtn>
+        </div>
+      </div>
+
+      {/* Company name + contact */}
+      <div>
+        <p
+          style={{
+            fontSize: 15,
+            fontWeight: 700,
+            color: "hsl(var(--text-main))",
+            margin: 0,
+            lineHeight: 1.3,
+          }}
+        >
+          {proveedor.company}
+        </p>
+        {proveedor.contact && (
+          <p style={{ fontSize: 12, color: "hsl(var(--text-sub))", margin: "3px 0 0" }}>
+            {proveedor.contact}
+          </p>
+        )}
+      </div>
+
+      {/* Contact info */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+        {proveedor.email && (
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <Mail size={12} style={{ color: "hsl(var(--text-muted))", flexShrink: 0 }} />
+            <span
+              style={{
+                fontSize: 12,
+                color: "hsl(var(--text-sub))",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {proveedor.email}
+            </span>
+          </div>
+        )}
+        {proveedor.phone && (
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <Phone size={12} style={{ color: "hsl(var(--text-muted))", flexShrink: 0 }} />
+            <span style={{ fontSize: 12, color: "hsl(var(--text-sub))" }}>
+              {proveedor.phone}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Pills: productos + compras */}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <span
+          style={{
+            backgroundColor: "hsl(var(--green) / 0.15)",
+            color: "hsl(var(--green))",
+            borderRadius: 99,
+            fontSize: 11,
+            fontWeight: 600,
+            padding: "2px 10px",
+          }}
+        >
+          {proveedor.productos_count} productos
+        </span>
+        <span
+          style={{
+            backgroundColor: "hsl(var(--navy) / 0.15)",
+            color: "hsl(var(--navy))",
+            borderRadius: 99,
+            fontSize: 11,
+            fontWeight: 600,
+            padding: "2px 10px",
+          }}
+        >
+          {proveedor.compras_count} compras
+        </span>
+      </div>
+
+      {/* Footer: total spent + Ver detalles */}
+      <div
+        style={{
+          borderTop: "1px solid hsl(var(--border))",
+          paddingTop: 12,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        <div>
+          <p
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              textTransform: "uppercase",
+              letterSpacing: "0.04em",
+              color: "hsl(var(--text-muted))",
+              margin: 0,
+            }}
+          >
+            Gasto total
+          </p>
+          <p
+            style={{
+              fontSize: 16,
+              fontWeight: 700,
+              color: "hsl(var(--terracota))",
+              margin: "2px 0 0",
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
+            {formatCurrency(proveedor.total_spent)}
+          </p>
+        </div>
+        <button
+          onClick={(e) => { e.stopPropagation(); onDetail(); }}
+          style={{
+            padding: "6px 14px",
+            fontSize: 12,
+            fontWeight: 500,
+            borderRadius: 8,
+            border: "1px solid hsl(var(--border))",
+            backgroundColor: "transparent",
+            color: "hsl(var(--text-sub))",
+            cursor: "pointer",
+            fontFamily: "inherit",
+            transition: "background-color 0.12s ease",
+          }}
+          onMouseEnter={(e) =>
+            ((e.currentTarget as HTMLButtonElement).style.backgroundColor =
+              "hsl(var(--surface-hover))")
+          }
+          onMouseLeave={(e) =>
+            ((e.currentTarget as HTMLButtonElement).style.backgroundColor = "transparent")
+          }
+        >
+          Ver detalles
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── ActionBtn ────────────────────────────────────────────────────────────────
+
+function ActionBtn({
+  children,
+  onClick,
+  title,
+  color,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  title: string;
+  color: string;
+}) {
+  const [hovered, setHovered] = useState(false);
+
+  return (
+    <button
+      type="button"
+      title={title}
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: 28,
+        height: 28,
+        borderRadius: 6,
+        border: "none",
+        cursor: "pointer",
+        backgroundColor: hovered ? `${color}22` : "transparent",
+        color,
+        transition: "background-color 0.12s ease",
+        fontFamily: "inherit",
+      }}
+    >
+      {children}
+    </button>
   );
 }
