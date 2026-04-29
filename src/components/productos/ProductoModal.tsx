@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -42,25 +42,46 @@ export function ProductoModal({
     register,
     handleSubmit,
     setValue,
+    reset,
     formState: { errors },
   } = useForm<ProductoInput>({
     resolver: zodResolver(productoSchema),
-    defaultValues: editTarget
-      ? {
-          nombre: editTarget.nombre,
-          categoria_id: editTarget.categoria_id,
-          unidad: editTarget.unidad,
-          stock_minimo: editTarget.stock_minimo,
-          last_price: editTarget.last_price,
-        }
-      : {
-          nombre: "",
-          categoria_id: categorias[0]?.id ?? "",
-          unidad: "kg",
-          stock_minimo: 5,
-          last_price: 0,
-        },
+    defaultValues: {
+      nombre: "",
+      categoria_id: categorias[0]?.id ?? "",
+      unidad: "kg",
+      stock_minimo: 5,
+      last_price: 0,
+    },
   });
+
+  // Reset form whenever modal opens or editTarget changes
+  useEffect(() => {
+    if (!open) return;
+    if (editTarget) {
+      reset({
+        nombre: editTarget.nombre,
+        categoria_id: editTarget.categoria_id,
+        unidad: editTarget.unidad,
+        stock_minimo: editTarget.stock_minimo,
+        last_price: editTarget.last_price,
+      });
+    } else {
+      reset({
+        nombre: "",
+        categoria_id: categorias[0]?.id ?? "",
+        unidad: "kg",
+        stock_minimo: 5,
+        last_price: 0,
+      });
+    }
+    // Also reset the new category mini-form
+    setShowNewCat(false);
+    setNewCatNombre("");
+    setNewCatColor("#106653");
+    setNewCatError("");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, editTarget]);
 
   function onSubmit(data: ProductoInput) {
     startTransition(async () => {
