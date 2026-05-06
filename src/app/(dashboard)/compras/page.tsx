@@ -3,9 +3,24 @@ import { getProveedores } from "@/lib/actions/proveedores.actions";
 import { getProductos } from "@/lib/actions/productos.actions";
 import ComprasClient from "./ComprasClient";
 
-export default async function ComprasPage() {
+interface SearchParams {
+  desde?: string;
+  hasta?: string;
+  supplier_id?: string;
+  page?: string;
+}
+
+export default async function ComprasPage({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
   const [{ data: ordenes }, { data: proveedores }, { data: productos }] = await Promise.all([
-    getOrdenes(),
+    getOrdenes({
+      desde: searchParams.desde,
+      hasta: searchParams.hasta,
+      supplier_id: searchParams.supplier_id,
+    }),
     getProveedores(),
     getProductos(),
   ]);
@@ -15,6 +30,11 @@ export default async function ComprasPage() {
       ordenes={ordenes ?? []}
       proveedores={(proveedores ?? []).filter((p) => p.activo)}
       productos={productos ?? []}
+      initialFilters={{
+        desde: searchParams.desde ?? "",
+        hasta: searchParams.hasta ?? "",
+        supplier_id: searchParams.supplier_id ?? "",
+      }}
     />
   );
 }
