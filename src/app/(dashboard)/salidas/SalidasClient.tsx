@@ -186,7 +186,7 @@ export default function SalidasClient({ movimientos: initial, productos }: Props
                 <thead>
                   <tr style={{ backgroundColor: "hsl(var(--surface-alt))" }}>
                     {["Fecha", "Producto", "Cantidad", "Valor", "Notas", ""].map((h) => (
-                      <th key={h} style={thStyle}>{h}</th>
+                      <th key={h} style={{ ...thStyle, textAlign: (h === "Cantidad" || h === "Valor") ? "center" : "left" }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -217,7 +217,7 @@ export default function SalidasClient({ movimientos: initial, productos }: Props
                           {" "}
                           <span style={{ fontSize: 11, color: "hsl(var(--text-muted))" }}>{prod?.unidad}</span>
                         </td>
-                        <td style={{ padding: "11px 14px", textAlign: "right" }}>
+                        <td style={{ padding: "11px 14px", textAlign: "center" }}>
                           <span style={{ fontWeight: 700, color: "hsl(var(--navy))", fontVariantNumeric: "tabular-nums" }}>
                             {formatCurrency(valor)}
                           </span>
