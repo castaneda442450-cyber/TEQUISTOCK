@@ -222,15 +222,15 @@ const TIPO_LABELS: Record<string, string> = {
 };
 
 function MovimientosTable({ result }: { result: MovimientosResult }) {
-  const cols = [62, 62, 185, 72, 79];
+  const cols = [68, 60, 170, 80, 82];
   return (
     <View>
       <View style={s.tableHead}>
         <Text style={[s.thText, { width: cols[0] }]}>FECHA</Text>
         <Text style={[s.thText, { width: cols[1] }]}>TIPO</Text>
         <Text style={[s.thText, { width: cols[2] }]}>PRODUCTO</Text>
-        <Text style={[s.thText, { width: cols[3], textAlign: "right" }]}>CANTIDAD</Text>
-        <Text style={[s.thText, { width: cols[4] }]}>REFERENCIA</Text>
+        <Text style={[s.thText, { width: cols[3], textAlign: "right", paddingRight: 8 }]}>CANTIDAD</Text>
+        <Text style={[s.thText, { width: cols[4], paddingLeft: 8 }]}>REFERENCIA</Text>
       </View>
       {result.rows.map((row, i) => {
         const isEntrada = row.tipo === "entrada";
@@ -241,10 +241,10 @@ function MovimientosTable({ result }: { result: MovimientosResult }) {
             <Text style={[s.cell, { width: cols[0] }]}>{row.fecha}</Text>
             <Text style={[s.cell, { width: cols[1] }]}>{TIPO_LABELS[row.tipo] ?? row.tipo}</Text>
             <Text style={[s.cell, { width: cols[2] }]}>{row.nombre}</Text>
-            <Text style={{ fontSize: 8.5, fontFamily: "Helvetica-Bold", color: qtyColor, textAlign: "right", width: cols[3] }}>
+            <Text style={{ fontSize: 8.5, fontFamily: "Helvetica-Bold", color: qtyColor, textAlign: "right", paddingRight: 8, width: cols[3] }}>
               {qtyStr}
             </Text>
-            <Text style={[s.cellMuted, { width: cols[4] }]}>{row.referencia ?? "—"}</Text>
+            <Text style={[s.cellMuted, { width: cols[4], paddingLeft: 8 }]}>{row.referencia ?? "—"}</Text>
           </View>
         );
       })}
