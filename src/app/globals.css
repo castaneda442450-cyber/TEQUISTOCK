@@ -57,6 +57,21 @@ html {
   scroll-behavior: smooth;
 }
 
+/* View Transitions — theme toggle */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+::view-transition-old(root) {
+  z-index: 1;
+}
+
+::view-transition-new(root) {
+  z-index: 9999;
+}
+
 body {
   background-color: hsl(var(--bg));
   color: hsl(var(--text-main));
@@ -83,6 +98,23 @@ input:focus, textarea:focus, select:focus {
 }
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+/* Critical stock chip hover */
+.critical-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: hsl(var(--surface-alt));
+  border: 1px solid rgba(186, 48, 38, 0.22);
+  border-radius: 8px;
+  padding: 5px 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.critical-chip:hover {
+  border-color: rgba(186, 48, 38, 0.5);
+  box-shadow: 0 2px 8px rgba(186, 48, 38, 0.10);
 }
 
 /* Scrollbar styling */
