@@ -1,3 +1,7 @@
+"use client";
+
+// This module must only be loaded client-side via dynamic import.
+// @react-pdf/renderer uses canvas/browser APIs that break SSR/Turbopack static analysis.
 import React from "react";
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { formatCurrency, formatDate } from "@/lib/format";
@@ -10,13 +14,13 @@ import type {
 
 export type ReportType = "gastos_producto" | "gastos_proveedor" | "merma" | "movimientos";
 
-type ReportData =
+export type ReportData =
   | { type: "gastos_producto"; result: GastoProductoResult }
   | { type: "gastos_proveedor"; result: GastoProveedorResult }
   | { type: "merma"; result: MermaResult }
   | { type: "movimientos"; result: MovimientosResult };
 
-interface ReportPDFProps {
+export interface ReportPDFProps {
   reportData: ReportData;
   desde: string;
   hasta: string;
@@ -71,8 +75,6 @@ const s = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     marginTop: 10,
-    paddingTop: 8,
-    paddingHorizontal: 6,
     borderTopWidth: 1.5,
     borderTopColor: "#E5E7EB",
     backgroundColor: "#F3F4F6",
@@ -99,13 +101,13 @@ function Header({ type, desde, hasta }: { type: ReportType; desde: string; hasta
       <Text style={s.brand}>TEQUISTOCK</Text>
       <Text style={s.reportName}>{REPORT_NAMES[type]}</Text>
       <Text style={s.meta}>
-        Período: {periodo}   ·   Generado: {formatDate(today)}
+        {"Período: " + periodo + "   ·   Generado: " + formatDate(today)}
       </Text>
     </View>
   );
 }
 
-function Footer() {
+function PDFFooter() {
   return (
     <View style={s.footer} fixed>
       <Text style={s.footerText}>TequiStock</Text>
@@ -119,8 +121,6 @@ function Footer() {
     </View>
   );
 }
-
-// ─── Report 1: Gastos por Producto ───────────────────────────────────────────
 
 function GastoProductoTable({ result }: { result: GastoProductoResult }) {
   const cols = [180, 58, 58, 82, 82];
@@ -139,8 +139,8 @@ function GastoProductoTable({ result }: { result: GastoProductoResult }) {
             <Text style={s.cell}>{row.nombre}</Text>
             <Text style={s.cellMuted}>{row.categoria}</Text>
           </View>
-          <Text style={[s.cellCenter, { width: cols[1] }]}>{row.cant_comprada}</Text>
-          <Text style={[s.cellCenter, { width: cols[2] }]}>{row.veces_comprado}</Text>
+          <Text style={[s.cellCenter, { width: cols[1] }]}>{String(row.cant_comprada)}</Text>
+          <Text style={[s.cellCenter, { width: cols[2] }]}>{String(row.veces_comprado)}</Text>
           <Text style={[s.cellBold, { width: cols[3] }]}>{formatCurrency(row.gasto_total)}</Text>
           <Text style={[s.cellRight, { width: cols[4] }]}>{formatCurrency(row.promedio_por_compra)}</Text>
         </View>
@@ -152,8 +152,6 @@ function GastoProductoTable({ result }: { result: GastoProductoResult }) {
     </View>
   );
 }
-
-// ─── Report 2: Gastos por Proveedor ──────────────────────────────────────────
 
 function GastoProveedorTable({ result }: { result: GastoProveedorResult }) {
   const cols = [160, 55, 65, 92, 88];
@@ -172,8 +170,8 @@ function GastoProveedorTable({ result }: { result: GastoProveedorResult }) {
             <Text style={s.cell}>{row.company}</Text>
             {row.contact ? <Text style={s.cellMuted}>{row.contact}</Text> : null}
           </View>
-          <Text style={[s.cellCenter, { width: cols[1] }]}>{row.num_compras}</Text>
-          <Text style={[s.cellCenter, { width: cols[2] }]}>{row.num_productos_distintos}</Text>
+          <Text style={[s.cellCenter, { width: cols[1] }]}>{String(row.num_compras)}</Text>
+          <Text style={[s.cellCenter, { width: cols[2] }]}>{String(row.num_productos_distintos)}</Text>
           <Text style={[s.cellBold, { width: cols[3] }]}>{formatCurrency(row.total_gastado)}</Text>
           <Text style={[s.cellRight, { width: cols[4] }]}>{formatCurrency(row.ticket_promedio)}</Text>
         </View>
@@ -185,8 +183,6 @@ function GastoProveedorTable({ result }: { result: GastoProveedorResult }) {
     </View>
   );
 }
-
-// ─── Report 3: Análisis de Merma ─────────────────────────────────────────────
 
 function MermaTable({ result }: { result: MermaResult }) {
   const cols = [168, 58, 90, 84, 60];
@@ -205,10 +201,10 @@ function MermaTable({ result }: { result: MermaResult }) {
             <Text style={s.cell}>{row.nombre}</Text>
             <Text style={s.cellMuted}>{row.categoria}</Text>
           </View>
-          <Text style={[s.cellCenter, { width: cols[1] }]}>{row.cant_perdida}</Text>
+          <Text style={[s.cellCenter, { width: cols[1] }]}>{String(row.cant_perdida)}</Text>
           <Text style={[s.cell, { width: cols[2] }]}>{row.tipo_predominante}</Text>
           <Text style={[s.cellBold, { width: cols[3] }]}>{formatCurrency(row.valor_perdido)}</Text>
-          <Text style={[s.cellRight, { width: cols[4] }]}>{row.porcentaje_del_total}%</Text>
+          <Text style={[s.cellRight, { width: cols[4] }]}>{row.porcentaje_del_total + "%"}</Text>
         </View>
       ))}
       <View style={s.totalsRow}>
@@ -218,8 +214,6 @@ function MermaTable({ result }: { result: MermaResult }) {
     </View>
   );
 }
-
-// ─── Report 4: Movimientos de Inventario ─────────────────────────────────────
 
 const TIPO_LABELS: Record<string, string> = {
   entrada: "Entrada",
@@ -241,13 +235,13 @@ function MovimientosTable({ result }: { result: MovimientosResult }) {
       {result.rows.map((row, i) => {
         const isEntrada = row.tipo === "entrada";
         const qtyColor = isEntrada ? "#106653" : "#BA3026";
-        const qtyStr = `${isEntrada ? "+" : "-"}${row.qty}`;
+        const qtyStr = (isEntrada ? "+" : "-") + String(row.qty);
         return (
           <View key={row.id} style={[s.row, i % 2 === 0 ? s.rowEven : s.rowOdd]}>
             <Text style={[s.cell, { width: cols[0] }]}>{row.fecha}</Text>
             <Text style={[s.cell, { width: cols[1] }]}>{TIPO_LABELS[row.tipo] ?? row.tipo}</Text>
             <Text style={[s.cell, { width: cols[2] }]}>{row.nombre}</Text>
-            <Text style={[{ fontSize: 8.5, fontFamily: "Helvetica-Bold", color: qtyColor, textAlign: "right", width: cols[3] }]}>
+            <Text style={{ fontSize: 8.5, fontFamily: "Helvetica-Bold", color: qtyColor, textAlign: "right", width: cols[3] }}>
               {qtyStr}
             </Text>
             <Text style={[s.cellMuted, { width: cols[4] }]}>{row.referencia ?? "—"}</Text>
@@ -263,29 +257,21 @@ function MovimientosTable({ result }: { result: MovimientosResult }) {
   );
 }
 
-// ─── Main PDF Component ───────────────────────────────────────────────────────
-
 export function ReportPDF({ reportData, desde, hasta }: ReportPDFProps) {
   return (
     <Document>
       <Page size="LETTER" style={s.page}>
         <Header type={reportData.type} desde={desde} hasta={hasta} />
         <View style={s.separator} />
-
         {reportData.type === "gastos_producto" && (
           <GastoProductoTable result={reportData.result} />
         )}
         {reportData.type === "gastos_proveedor" && (
           <GastoProveedorTable result={reportData.result} />
         )}
-        {reportData.type === "merma" && (
-          <MermaTable result={reportData.result} />
-        )}
-        {reportData.type === "movimientos" && (
-          <MovimientosTable result={reportData.result} />
-        )}
-
-        <Footer />
+        {reportData.type === "merma" && <MermaTable result={reportData.result} />}
+        {reportData.type === "movimientos" && <MovimientosTable result={reportData.result} />}
+        <PDFFooter />
       </Page>
     </Document>
   );
