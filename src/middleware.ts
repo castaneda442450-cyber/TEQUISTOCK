@@ -1,13 +1,15 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { createMiddlewareClient } from "@/lib/supabase/middleware";
 
 const PROTECTED = ["/dashboard", "/productos", "/proveedores", "/compras", "/salidas", "/reportes"];
-const SESSION_COOKIE = "tequistock_session";
-const SESSION_VALUE = "carlos_nieto_authenticated";
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const session = request.cookies.get(SESSION_COOKIE);
-  const isAuthed = session?.value === SESSION_VALUE;
+  const response = NextResponse.next();
+
+  const supabase = createMiddlewareClient(request, response);
+  const { data: { user } } = await supabase.auth.getUser();
+  const isAuthed = !!user;
 
   const isProtected = PROTECTED.some((p) => pathname === p || pathname.startsWith(p + "/"));
 
@@ -23,7 +25,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
-  return NextResponse.next();
+  return response;
 }
 
 export const config = {
