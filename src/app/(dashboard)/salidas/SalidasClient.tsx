@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { LogOut, Trash2, Plus } from "lucide-react";
-import { deleteMovimiento } from "@/lib/actions/salidas.actions";
+import { anularMovimiento } from "@/lib/actions/salidas.actions";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { MERMA_COLORS } from "@/lib/constants";
 import { ConsumoModal } from "@/components/salidas/ConsumoModal";
@@ -84,10 +84,10 @@ export default function SalidasClient({ movimientos: initial, productos }: Props
     if (!deleteTarget) return;
     const id = deleteTarget.id;
     startTransition(async () => {
-      const res = await deleteMovimiento(id);
+      const res = await anularMovimiento(id);
       if (res.error) { toast.error(res.error); return; }
       setMovimientos((prev) => prev.filter((m) => m.id !== id));
-      toast.success(deleteTarget.tipo === "salida" ? "Consumo eliminado" : "Merma eliminada");
+      toast.success(deleteTarget.tipo === "salida" ? "Consumo anulado" : "Merma anulada");
       setDeleteTarget(null);
     });
   }

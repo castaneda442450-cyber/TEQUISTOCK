@@ -13,10 +13,10 @@ export function SalidaDeleteModal({ movimiento, onConfirm, onCancel }: SalidaDel
   if (!movimiento) return null;
 
   const esConsumo = movimiento.tipo === "salida";
-  const titulo = esConsumo ? "Eliminar Consumo" : "Eliminar Merma";
+  const titulo = esConsumo ? "Anular Consumo" : "Anular Merma";
   const mensaje = esConsumo
-    ? "¿Eliminar este registro de consumo? El stock será revertido."
-    : "¿Eliminar este registro de merma? El stock será revertido.";
+    ? "¿Anular este consumo? Se registrará una entrada compensatoria y el stock será revertido."
+    : "¿Anular esta merma? Se registrará una entrada compensatoria y el stock será revertido.";
 
   return (
     <div
@@ -108,7 +108,7 @@ export function SalidaDeleteModal({ movimiento, onConfirm, onCancel }: SalidaDel
             }}
           >
             <Trash2 size={14} />
-            Sí, eliminar
+            Sí, anular
           </button>
         </div>
       </div>

@@ -101,30 +101,29 @@ export async function createMerma(
   return { data: mov as unknown as Movimiento, error: null };
 }
 
-export async function deleteMovimiento(id: string): Promise<{ error: string | null }> {
-  // Fetch to know type and qty for stock reversal
+export async function anularMovimiento(id: string): Promise<{ error: string | null }> {
   const { data: mov } = await sb()
     .from("movimientos")
-    .select("tipo,qty,product_id")
+    .select("tipo,qty,product_id,fecha")
     .eq("id", id)
     .single();
 
-  if (mov && (mov.tipo === "salida" || mov.tipo === "merma")) {
-    // Reverse stock: add qty back
-    const { data: prod } = await sb()
-      .from("productos")
-      .select("stock_actual")
-      .eq("id", mov.product_id)
-      .single();
-    if (prod) {
-      await sb()
-        .from("productos")
-        .update({ stock_actual: prod.stock_actual + mov.qty })
-        .eq("id", mov.product_id);
-    }
-  }
+  if (!mov) return { error: "Movimiento no encontrado" };
+  if (mov.tipo === "entrada") return { error: "No se puede anular una entrada" };
 
-  const { error } = await sb().from("movimientos").delete().eq("id", id);
+  // Insertar movimiento compensatorio de entrada — el trigger actualiza stock_actual
+  const { error } = await sb()
+    .from("movimientos")
+    .insert({
+      product_id: mov.product_id,
+      tipo: "entrada",
+      qty: mov.qty,
+      fecha: new Date().toISOString().split("T")[0],
+      user_id: CARLOS_USER_ID,
+      notes: `Anulación de ${mov.tipo} (ref: ${id})`,
+      ref_id: id,
+    });
+
   if (error) return { error: error.message };
 
   revalidatePath("/salidas");
