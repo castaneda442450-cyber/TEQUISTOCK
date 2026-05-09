@@ -1,6 +1,7 @@
 "use client";
 
 import "./ChartSetup";
+import { useMemo } from "react";
 import { Line } from "react-chartjs-2";
 import type { ChartOptions } from "chart.js";
 import { formatCurrency } from "@/lib/format";
@@ -15,7 +16,7 @@ const GOLD = "#C2972E";
 const GREEN = "#106653";
 
 export function SpendingTrendChart({ data }: SpendingTrendChartProps) {
-  const chartData = {
+  const chartData = useMemo(() => ({
     labels: data.map((d) => d.label),
     datasets: [
       {
@@ -51,9 +52,9 @@ export function SpendingTrendChart({ data }: SpendingTrendChartProps) {
         borderDash: [3, 3],
       },
     ],
-  };
+  }), [data]);
 
-  const options: ChartOptions<"line"> = {
+  const options = useMemo<ChartOptions<"line">>(() => ({
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
@@ -83,7 +84,7 @@ export function SpendingTrendChart({ data }: SpendingTrendChartProps) {
       },
     },
     interaction: { mode: "index", intersect: false },
-  };
+  }), []);
 
   return (
     <div style={{ height: 220 }}>

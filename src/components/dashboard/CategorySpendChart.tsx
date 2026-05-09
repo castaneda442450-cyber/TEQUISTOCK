@@ -1,6 +1,7 @@
 "use client";
 
 import "./ChartSetup";
+import { useMemo } from "react";
 import { Bar } from "react-chartjs-2";
 import type { ChartOptions } from "chart.js";
 import { CATEGORY_COLORS } from "@/lib/constants";
@@ -11,30 +12,30 @@ interface CategorySpendChartProps {
 }
 
 export function CategorySpendChart({ data }: CategorySpendChartProps) {
-  const sorted = Object.entries(data)
-    .filter(([, v]) => v > 0)
-    .sort((a, b) => b[1] - a[1]);
+  const chartData = useMemo(() => {
+    const sorted = Object.entries(data)
+      .filter(([, v]) => v > 0)
+      .sort((a, b) => b[1] - a[1]);
+    const labels = sorted.map(([k]) => k);
+    const values = sorted.map(([, v]) => v);
+    const colors = labels.map((c) => CATEGORY_COLORS[c] ?? "#888");
+    return {
+      labels,
+      datasets: [
+        {
+          label: "Gasto",
+          data: values,
+          backgroundColor: colors.map((c) => `${c}CC`),
+          borderColor: colors,
+          borderWidth: 2,
+          borderRadius: 6,
+          borderSkipped: false,
+        },
+      ],
+    };
+  }, [data]);
 
-  const labels = sorted.map(([k]) => k);
-  const values = sorted.map(([, v]) => v);
-  const colors = labels.map((c) => CATEGORY_COLORS[c] ?? "#888");
-
-  const chartData = {
-    labels,
-    datasets: [
-      {
-        label: "Gasto",
-        data: values,
-        backgroundColor: colors.map((c) => `${c}CC`),
-        borderColor: colors,
-        borderWidth: 2,
-        borderRadius: 6,
-        borderSkipped: false,
-      },
-    ],
-  };
-
-  const options: ChartOptions<"bar"> = {
+  const options = useMemo<ChartOptions<"bar">>(() => ({
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
@@ -58,9 +59,9 @@ export function CategorySpendChart({ data }: CategorySpendChartProps) {
         },
       },
     },
-  };
+  }), []);
 
-  if (labels.length === 0) {
+  if (chartData.labels.length === 0) {
     return (
       <div style={{ height: 220 }} className="flex items-center justify-center">
         <span className="text-[12px] text-text-muted">Sin gastos en este rango</span>
