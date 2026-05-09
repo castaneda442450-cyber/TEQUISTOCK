@@ -1,21 +1,39 @@
 import { CATEGORY_COLORS } from "@/lib/constants";
 
+type CategoryProp =
+  | { nombre: string; color: string }
+  | string
+  | null
+  | undefined;
+
 interface CategoryBadgeProps {
-  category: string;
+  category: CategoryProp;
 }
 
 export function CategoryBadge({ category }: CategoryBadgeProps) {
-  const color = CATEGORY_COLORS[category] ?? "#888";
+  if (!category) {
+    return <span style={{ fontSize: 11, color: "hsl(var(--text-muted))" }}>Sin categoría</span>;
+  }
+
+  const nombre = typeof category === "string" ? category : category.nombre;
+  const color =
+    typeof category === "string"
+      ? (CATEGORY_COLORS[category] ?? "#888")
+      : category.color;
+
   return (
     <span
-      className="inline-flex items-center rounded-pill text-[11px] font-semibold whitespace-nowrap"
       style={{
-        background: `${color}22`,
+        backgroundColor: color + "22",
         color,
+        borderRadius: 99,
+        fontSize: 11,
+        fontWeight: 600,
         padding: "2px 10px",
+        whiteSpace: "nowrap",
       }}
     >
-      {category}
+      {nombre}
     </span>
   );
 }

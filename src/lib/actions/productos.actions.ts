@@ -3,8 +3,8 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAuth } from "@/lib/actions/auth.actions";
 import { productoSchema, type ProductoInput } from "@/lib/schemas/producto.schema";
+import { categoriaSchema, type CategoriaInput } from "@/lib/schemas/categoria.schema";
 import { revalidatePath } from "next/cache";
-import { z } from "zod";
 import type { Producto } from "@/types";
 
 const sb = () => createAdminClient();
@@ -168,14 +168,7 @@ export async function getCategorias() {
   return { data, error: null };
 }
 
-const categoriaSchema = z.object({
-  nombre: z.string().trim().min(2, "Nombre mínimo 2 caracteres").max(40, "Máximo 40 caracteres"),
-  color: z
-    .string()
-    .regex(/^#([0-9A-Fa-f]{6})$/, "Color hex inválido (formato #RRGGBB)"),
-});
-
-export type CategoriaInput = z.infer<typeof categoriaSchema>;
+export type { CategoriaInput };
 
 export async function createCategoria(
   input: CategoriaInput,

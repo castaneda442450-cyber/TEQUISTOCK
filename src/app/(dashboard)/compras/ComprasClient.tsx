@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { ChevronDown, ChevronUp, Plus, Eye, Pencil, Trash2, FileText } from "lucide-react";
 import { deleteOrden } from "@/lib/actions/compras.actions";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { CategoryBadge } from "@/components/shared/CategoryBadge";
 import { CompraModal } from "@/components/compras/CompraModal";
 import { CompraDetailModal } from "@/components/compras/CompraDetailModal";
 import { CompraDeleteModal } from "@/components/compras/CompraDeleteModal";
@@ -25,22 +26,6 @@ interface Props {
 
 type ModalState = "create" | "edit" | "view" | "delete" | null;
 
-function CategoryBadge({ cat }: { cat?: Categoria | null }) {
-  if (!cat) return <span style={{ fontSize: 11, color: "hsl(var(--text-muted))" }}>—</span>;
-  return (
-    <span style={{
-      backgroundColor: cat.color + "22",
-      color: cat.color,
-      borderRadius: 99,
-      fontSize: 11,
-      fontWeight: 600,
-      padding: "2px 10px",
-      whiteSpace: "nowrap",
-    }}>
-      {cat.nombre}
-    </span>
-  );
-}
 
 export default function ComprasClient({ ordenes: initial, proveedores, productos, initialFilters }: Props) {
   const [ordenes, setOrdenes] = useState(initial);
@@ -376,7 +361,7 @@ export default function ComprasClient({ ordenes: initial, proveedores, productos
                                     padding: "8px 14px",
                                   }}
                                 >
-                                  <CategoryBadge cat={cat} />
+                                  <CategoryBadge category={cat} />
                                   <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: "hsl(var(--text-main))" }}>
                                     {prod?.nombre ?? "Producto"}
                                   </span>

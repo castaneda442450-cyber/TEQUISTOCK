@@ -5,7 +5,8 @@ import { toast } from "sonner";
 import { LogOut, Trash2, Plus } from "lucide-react";
 import { anularMovimiento } from "@/lib/actions/salidas.actions";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { MERMA_COLORS } from "@/lib/constants";
+import { CategoryBadge } from "@/components/shared/CategoryBadge";
+import { MermaBadge } from "@/components/shared/MermaBadge";
 import { ConsumoModal } from "@/components/salidas/ConsumoModal";
 import { MermaModal } from "@/components/salidas/MermaModal";
 import { SalidaDeleteModal } from "@/components/salidas/SalidaDeleteModal";
@@ -18,39 +19,6 @@ interface Props {
 
 type Tab = "consumo" | "merma";
 
-function CategoryBadge({ cat }: { cat?: { nombre: string; color: string } | null }) {
-  if (!cat) return <span style={{ fontSize: 11, color: "hsl(var(--text-muted))" }}>Sin categoría</span>;
-  return (
-    <span style={{
-      backgroundColor: cat.color + "22",
-      color: cat.color,
-      borderRadius: 99,
-      fontSize: 11,
-      fontWeight: 600,
-      padding: "2px 10px",
-      whiteSpace: "nowrap",
-    }}>
-      {cat.nombre}
-    </span>
-  );
-}
-
-function MermaBadge({ tipo }: { tipo: string }) {
-  const color = MERMA_COLORS[tipo] ?? "#78909C";
-  return (
-    <span style={{
-      backgroundColor: color + "22",
-      color,
-      borderRadius: 99,
-      fontSize: 11,
-      fontWeight: 600,
-      padding: "2px 10px",
-      whiteSpace: "nowrap",
-    }}>
-      {tipo}
-    </span>
-  );
-}
 
 export default function SalidasClient({ movimientos: initial, productos }: Props) {
   const [movimientos, setMovimientos] = useState(initial);
@@ -210,7 +178,7 @@ export default function SalidasClient({ movimientos: initial, productos }: Props
                           <div style={{ fontWeight: 600, fontSize: 13, color: "hsl(var(--text-main))", marginBottom: 3 }}>
                             {prod?.nombre ?? "—"}
                           </div>
-                          <CategoryBadge cat={cat} />
+                          <CategoryBadge category={cat} />
                         </td>
                         <td style={{ padding: "11px 14px", textAlign: "center" }}>
                           <span style={{ fontWeight: 600, color: "hsl(var(--text-main))" }}>{m.qty}</span>
@@ -322,7 +290,7 @@ export default function SalidasClient({ movimientos: initial, productos }: Props
                           <div style={{ fontWeight: 600, fontSize: 13, color: "hsl(var(--text-main))", marginBottom: 3 }}>
                             {prod?.nombre ?? "—"}
                           </div>
-                          <CategoryBadge cat={cat} />
+                          <CategoryBadge category={cat} />
                         </td>
                         <td style={{ padding: "11px 14px", textAlign: "center" }}>
                           <span style={{ fontWeight: 600, color: "hsl(var(--text-main))" }}>{m.qty}</span>
@@ -330,7 +298,7 @@ export default function SalidasClient({ movimientos: initial, productos }: Props
                           <span style={{ fontSize: 11, color: "hsl(var(--text-muted))" }}>{prod?.unidad}</span>
                         </td>
                         <td style={{ padding: "11px 14px" }}>
-                          {m.motivo_merma ? <MermaBadge tipo={m.motivo_merma} /> : "—"}
+                          {m.motivo_merma ? <MermaBadge type={m.motivo_merma} /> : "—"}
                         </td>
                         <td style={{ padding: "11px 14px", textAlign: "right" }}>
                           <span style={{ fontWeight: 700, color: "hsl(var(--terracota))", fontVariantNumeric: "tabular-nums" }}>
