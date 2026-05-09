@@ -163,7 +163,7 @@ export default function LoginPage() {
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      backgroundImage: "url('/imagenLogin.png')",
+      backgroundImage: "url('/imagenLogin.webp')",
       backgroundSize: "cover",
       backgroundPosition: "center",
       backgroundRepeat: "no-repeat",
