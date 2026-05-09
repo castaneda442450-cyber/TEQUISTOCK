@@ -109,8 +109,8 @@ function LoginForm() {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} noValidate>
-      <Field id="username" label="Usuario" type="text"
-        placeholder="Tu usuario" icon={User}
+      <Field id="username" label="Usuario" type="email"
+        placeholder="correo@ejemplo.com" icon={User}
         error={errors.username?.message} reg={register("username")} />
 
       <Field id="password" label="Contraseña" type={showPass ? "text" : "password"}
