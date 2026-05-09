@@ -1,13 +1,3 @@
-export const CATEGORIES = [
-  "Carnes",
-  "Lácteos",
-  "Verduras",
-  "Bebidas",
-  "Granos",
-  "Condimentos",
-  "Mariscos",
-];
-
 export const CATEGORY_COLORS: Record<string, string> = {
   Carnes: "#BA3026",
   Lácteos: "#C2972E",
@@ -28,8 +18,19 @@ export const MERMA_COLORS: Record<string, string> = {
 };
 
 export const UNIDADES = [
+  // Sistema métrico
   "kg",
+  "g",
   "L",
+  "mL",
+  // Sistema inglés
+  "lb",
+  "oz",
+  "fl oz",
+  "gal",
+  "qt",
+  "pt",
+  // Unidades generales
   "pz",
   "caja",
   "docena",

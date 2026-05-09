@@ -100,20 +100,29 @@ export function ProductosTable({ productos, categorias, onEdit, onDelete }: Prod
               : estado === "bajo"
                 ? "hsl(var(--gold))"
                 : "hsl(var(--green))";
+          const label = estado === "critico" ? "CRÍTICO" : estado === "bajo" ? "BAJO" : "OK";
+          const bg =
+            estado === "critico"
+              ? "hsl(var(--terracota) / 0.12)"
+              : estado === "bajo"
+                ? "hsl(var(--gold) / 0.12)"
+                : "hsl(var(--green) / 0.12)";
           return (
-            <span
-              style={{
-                fontWeight: 700,
-                fontSize: 14,
-                fontVariantNumeric: "tabular-nums",
-                color,
-              }}
-            >
-              {p.stock_actual}{" "}
-              <span style={{ fontSize: 11, fontWeight: 400, color: "hsl(var(--text-muted))" }}>
-                {p.unidad}
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+              <span style={{ fontWeight: 700, fontSize: 14, fontVariantNumeric: "tabular-nums", color }}>
+                {p.stock_actual}{" "}
+                <span style={{ fontSize: 11, fontWeight: 400, color: "hsl(var(--text-muted))" }}>
+                  {p.unidad}
+                </span>
               </span>
-            </span>
+              <span style={{
+                fontSize: 10, fontWeight: 700, letterSpacing: "0.06em",
+                padding: "2px 8px", borderRadius: 99,
+                backgroundColor: bg, color,
+              }}>
+                {label}
+              </span>
+            </div>
           );
         },
       },

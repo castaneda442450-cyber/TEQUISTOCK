@@ -1,17 +1,12 @@
 "use client";
 
-import { useState, useEffect, useRef, useTransition } from "react";
+import { useState, useEffect, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { X, Check, Loader2, Plus, FileText, Upload } from "lucide-react";
+import { X, Check, Loader2, Plus } from "lucide-react";
 import { ordenSchema, type OrdenInput } from "@/lib/schemas/compra.schema";
-import {
-  createOrden,
-  updateOrden,
-  uploadFactura,
-  deleteFactura,
-} from "@/lib/actions/compras.actions";
+import { createOrden, updateOrden } from "@/lib/actions/compras.actions";
 import { formatCurrency } from "@/lib/format";
 import type { OrdenCompra, Proveedor, Producto } from "@/types";
 
@@ -47,11 +42,8 @@ export function CompraModal({
 }: CompraModalProps) {
   const [isPending, startTransition] = useTransition();
   const [lines, setLines] = useState<LineItem[]>([{ product_id: "", qty: 1, price: 0 }]);
-  const [invoiceUploading, setInvoiceUploading] = useState(false);
-  const [invoiceUploaded, setInvoiceUploaded] = useState<{ path: string; name: string } | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { register, handleSubmit, watch, reset, setValue, formState: { errors } } = useForm<HeaderForm>({
+  const { register, handleSubmit, watch, reset, formState: { errors } } = useForm<HeaderForm>({
     defaultValues: {
       supplier_id: proveedores[0]?.id ?? "",
       fecha: new Date().toISOString().split("T")[0],
@@ -60,10 +52,8 @@ export function CompraModal({
     },
   });
 
-  const hasInvoice = watch("has_invoice");
   const selectedSupplierId = watch("supplier_id");
 
-  // Filter products by selected supplier
   const suppProds = (() => {
     const supp = proveedores.find((p) => p.id === selectedSupplierId);
     if (supp && supp.producto_ids && supp.producto_ids.length > 0) {
@@ -88,13 +78,6 @@ export function CompraModal({
           ? detalles.map((d: any) => ({ product_id: d.product_id, qty: d.qty, price: d.price }))
           : [{ product_id: "", qty: 1, price: 0 }],
       );
-      if (editTarget.invoice_url) {
-        const parts = editTarget.invoice_url.split("_");
-        const name = parts.slice(1).join("_") || editTarget.invoice_url;
-        setInvoiceUploaded({ path: editTarget.invoice_url, name });
-      } else {
-        setInvoiceUploaded(null);
-      }
     } else {
       reset({
         supplier_id: proveedores[0]?.id ?? "",
@@ -103,7 +86,6 @@ export function CompraModal({
         has_invoice: false,
       });
       setLines([{ product_id: "", qty: 1, price: 0 }]);
-      setInvoiceUploaded(null);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, editTarget]);
@@ -131,37 +113,6 @@ export function CompraModal({
 
   const total = lines.reduce((s, l) => s + (Number(l.qty) || 0) * (Number(l.price) || 0), 0);
 
-  async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setInvoiceUploading(true);
-    try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await uploadFactura(fd);
-      if (res.error) {
-        toast.error(`Error al subir factura: ${res.error}`);
-      } else {
-        setInvoiceUploaded({ path: res.path!, name: file.name });
-      }
-    } finally {
-      setInvoiceUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
-  }
-
-  async function removeInvoice() {
-    if (!invoiceUploaded) return;
-    // Only delete from Storage if it's a new upload (not the original from editTarget)
-    const isOriginal = editTarget?.invoice_url === invoiceUploaded.path;
-    if (!isOriginal) {
-      await deleteFactura(invoiceUploaded.path);
-    }
-    setInvoiceUploaded(null);
-    setValue("has_invoice", false);
-  }
-
   function onSubmit(data: HeaderForm) {
     const validLines = lines.filter((l) => l.product_id && Number(l.qty) > 0 && Number(l.price) > 0);
     if (validLines.length === 0) {
@@ -174,7 +125,7 @@ export function CompraModal({
       fecha: data.fecha,
       folio: data.folio || undefined,
       has_invoice: data.has_invoice,
-      invoice_url: data.has_invoice && invoiceUploaded ? invoiceUploaded.path : null,
+      invoice_url: null,
       detalles: validLines.map((l) => ({
         product_id: l.product_id,
         qty: Number(l.qty),
@@ -185,22 +136,12 @@ export function CompraModal({
     startTransition(async () => {
       if (editTarget) {
         const res = await updateOrden(editTarget.id, input);
-        if (res.error) {
-          toast.error(res.error);
-          return;
-        }
+        if (res.error) { toast.error(res.error); return; }
         toast.success("Compra actualizada");
         onSuccess(res.data!);
       } else {
         const res = await createOrden(input);
-        if (res.error) {
-          // Rollback new invoice upload if it failed
-          if (invoiceUploaded && !editTarget) {
-            await deleteFactura(invoiceUploaded.path);
-          }
-          toast.error(res.error);
-          return;
-        }
+        if (res.error) { toast.error(res.error); return; }
         toast.success("Compra registrada — stock actualizado");
         onSuccess(res.data!);
       }
@@ -262,15 +203,13 @@ export function CompraModal({
           </button>
         </div>
 
-        {/* Scrollable body */}
         <form onSubmit={handleSubmit(onSubmit)} style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
           <div style={{ padding: "20px 24px", overflowY: "auto", flex: 1, display: "flex", flexDirection: "column", gap: 20 }}>
 
-            {/* Section: Info General */}
+            {/* Info General */}
             <div>
               <div style={sectionTitleStyle}>Información General</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                {/* Fecha */}
                 <div>
                   <label style={labelStyle}>Fecha de Compra *</label>
                   <input
@@ -281,7 +220,6 @@ export function CompraModal({
                   {errors.fecha && <p style={errorStyle}>{errors.fecha.message}</p>}
                 </div>
 
-                {/* Proveedor */}
                 <div>
                   <label style={labelStyle}>Proveedor *</label>
                   <select
@@ -296,7 +234,6 @@ export function CompraModal({
                   {errors.supplier_id && <p style={errorStyle}>{errors.supplier_id.message}</p>}
                 </div>
 
-                {/* Folio */}
                 <div>
                   <label style={labelStyle}>Folio / # Factura</label>
                   <input
@@ -307,164 +244,36 @@ export function CompraModal({
                   />
                 </div>
 
-                {/* Checkbox tiene factura */}
-                <div style={{ display: "flex", alignItems: "center" }}>
-                  <div style={{ paddingTop: 22 }}>
-                    <label style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      cursor: "pointer",
-                      fontSize: 13,
-                      color: "hsl(var(--text-main))",
-                    }}>
-                      <input
-                        {...register("has_invoice")}
-                        type="checkbox"
-                        style={{ width: 16, height: 16, cursor: "pointer", accentColor: "hsl(var(--green))" }}
-                      />
-                      ¿Tiene factura?
-                    </label>
-                  </div>
+                <div style={{ display: "flex", alignItems: "center", paddingTop: 22 }}>
+                  <label style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    cursor: "pointer",
+                    fontSize: 13,
+                    color: "hsl(var(--text-main))",
+                  }}>
+                    <input
+                      {...register("has_invoice")}
+                      type="checkbox"
+                      style={{ width: 16, height: 16, cursor: "pointer", accentColor: "hsl(var(--green))" }}
+                    />
+                    ¿Tiene factura?
+                  </label>
                 </div>
               </div>
             </div>
 
-            {/* Section: Subir Factura (condicional) */}
-            {hasInvoice && (
-              <div>
-                <div style={sectionTitleStyle}>Archivo de Factura</div>
-                {invoiceUploading ? (
-                  <div style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    padding: "14px 18px",
-                    borderRadius: 8,
-                    border: "1px dashed hsl(var(--border))",
-                    backgroundColor: "hsl(var(--surface-alt))",
-                    color: "hsl(var(--text-sub))",
-                    fontSize: 13,
-                  }}>
-                    <Loader2 size={16} style={{ animation: "spin 0.7s linear infinite", color: "hsl(var(--navy))" }} />
-                    Subiendo factura...
-                  </div>
-                ) : invoiceUploaded ? (
-                  <div style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    padding: "12px 16px",
-                    borderRadius: 8,
-                    border: "1px solid hsl(var(--green) / 0.3)",
-                    backgroundColor: "hsl(var(--green) / 0.07)",
-                  }}>
-                    <div style={{
-                      width: 30, height: 30, borderRadius: 6,
-                      backgroundColor: "hsl(var(--green) / 0.15)",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      flexShrink: 0,
-                    }}>
-                      <Check size={15} style={{ color: "hsl(var(--green))" }} />
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: "hsl(var(--text-main))", wordBreak: "break-all" }}>
-                        {invoiceUploaded.name}
-                      </div>
-                      <div style={{ fontSize: 11, color: "hsl(var(--green))", marginTop: 2 }}>
-                        Factura subida correctamente
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={removeInvoice}
-                      style={{
-                        padding: 6, borderRadius: 6, border: "none",
-                        background: "hsl(var(--terracota) / 0.1)",
-                        cursor: "pointer", display: "flex", alignItems: "center",
-                        color: "hsl(var(--terracota))",
-                        flexShrink: 0,
-                      }}
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                ) : (
-                  <div>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept=".pdf,.jpg,.jpeg,.png"
-                      onChange={handleFileSelect}
-                      style={{ display: "none" }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      style={{
-                        width: "100%",
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: 8,
-                        padding: "24px 16px",
-                        borderRadius: 8,
-                        border: "2px dashed hsl(var(--border))",
-                        backgroundColor: "hsl(var(--surface-alt))",
-                        cursor: "pointer",
-                        transition: "border-color 0.15s, background-color 0.15s",
-                        fontFamily: "inherit",
-                      }}
-                      onMouseEnter={(e) => {
-                        (e.currentTarget as HTMLElement).style.borderColor = "hsl(var(--navy))";
-                        (e.currentTarget as HTMLElement).style.backgroundColor = "hsl(var(--navy) / 0.04)";
-                      }}
-                      onMouseLeave={(e) => {
-                        (e.currentTarget as HTMLElement).style.borderColor = "hsl(var(--border))";
-                        (e.currentTarget as HTMLElement).style.backgroundColor = "hsl(var(--surface-alt))";
-                      }}
-                    >
-                      <div style={{
-                        width: 40, height: 40, borderRadius: 10,
-                        backgroundColor: "hsl(var(--navy) / 0.1)",
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                      }}>
-                        <Upload size={18} style={{ color: "hsl(var(--navy))" }} />
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: "hsl(var(--text-main))", textAlign: "center" }}>
-                          Haz clic para seleccionar archivo
-                        </div>
-                        <div style={{ fontSize: 12, color: "hsl(var(--text-muted))", textAlign: "center", marginTop: 2 }}>
-                          PDF, JPG o PNG — se sube inmediatamente
-                        </div>
-                      </div>
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Section: Productos */}
+            {/* Productos */}
             <div style={{ borderTop: "1px solid hsl(var(--border))", paddingTop: 20 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-                <div style={sectionTitleStyle}>Productos</div>
-              </div>
+              <div style={sectionTitleStyle}>Productos</div>
 
-              {/* Column headers */}
-              <div style={{
-                display: "grid",
-                gridTemplateColumns: "2fr 1fr 1fr 32px",
-                gap: 8,
-                marginBottom: 6,
-              }}>
+              <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 32px", gap: 8, marginBottom: 6 }}>
                 {["Producto", "Cantidad", "Precio Unit.", ""].map((h) => (
                   <div key={h} style={labelStyle}>{h}</div>
                 ))}
               </div>
 
-              {/* Lines */}
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {lines.map((line, i) => (
                   <div key={i} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 32px", gap: 8, alignItems: "center" }}>

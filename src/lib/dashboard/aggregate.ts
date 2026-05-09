@@ -107,7 +107,7 @@ export function aggregateMetrics(opts: {
   const mermaPrior = sumMermas(opts.mermasPrior);
 
   const productosCriticos = opts.productos.filter(
-    (p) => (p.stock_actual ?? 0) < (p.stock_minimo ?? 0),
+    (p) => (p.stock_actual ?? 0) <= (p.stock_minimo ?? 0),
   ).length;
 
   return {
@@ -214,7 +214,7 @@ export function aggregateTopMerma(
 
 export function aggregateCriticalProducts(productos: ProductoRaw[]): CriticalProductRow[] {
   return productos
-    .filter((p) => (p.stock_actual ?? 0) < (p.stock_minimo ?? 0))
+    .filter((p) => (p.stock_actual ?? 0) <= (p.stock_minimo ?? 0))
     .map((p) => ({
       id: p.id,
       nombre: p.nombre,
@@ -233,22 +233,24 @@ export function aggregateSpendingTrend(opts: {
   startIso: string;
   bucketCount: number;
 }): SpendingTrendPoint[] {
-  // Build daily buckets keyed by yyyy-MM-dd
+  // Build buckets using the date-only part of startIso to avoid timezone shifts.
+  // addDays on a midnight-UTC date can render as the previous day in local time,
+  // so we work entirely with YYYY-MM-DD strings by parsing manually.
   const buckets = new Map<string, { compras: number; merma: number; label: string }>();
-  const start = new Date(opts.startIso);
+  const startDate = parseLocalDate(opts.startIso.slice(0, 10));
   for (let i = 0; i < opts.bucketCount; i++) {
-    const d = addDays(start, i);
+    const d = addDays(startDate, i);
     const key = format(d, "yyyy-MM-dd");
     buckets.set(key, { compras: 0, merma: 0, label: format(d, "M/d") });
   }
 
   for (const o of opts.orders) {
-    const key = format(new Date(o.fecha), "yyyy-MM-dd");
+    const key = o.fecha.slice(0, 10);
     const b = buckets.get(key);
     if (b) b.compras += o.total ?? 0;
   }
   for (const m of opts.mermas) {
-    const key = format(new Date(m.fecha), "yyyy-MM-dd");
+    const key = m.fecha.slice(0, 10);
     const b = buckets.get(key);
     if (b) b.merma += m.value_lost ?? 0;
   }
@@ -258,6 +260,12 @@ export function aggregateSpendingTrend(opts: {
     compras: b.compras,
     merma: b.merma,
   }));
+}
+
+// Parse a YYYY-MM-DD string as local midnight to avoid UTC-offset day shifts.
+function parseLocalDate(dateStr: string): Date {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  return new Date(year, month - 1, day);
 }
 
 // ─── Gasto por categoría ─────────────────────────────────────────────────────

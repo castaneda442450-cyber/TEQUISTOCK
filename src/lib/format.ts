@@ -32,7 +32,7 @@ export function formatNumber(n: number): string {
 export type StockEstado = "critico" | "bajo" | "optimo";
 
 export function getStockEstado(actual: number, minimo: number): StockEstado {
-  if (actual < minimo) return "critico";
+  if (actual <= minimo) return "critico";
   if (actual < minimo * 1.5) return "bajo";
   return "optimo";
 }

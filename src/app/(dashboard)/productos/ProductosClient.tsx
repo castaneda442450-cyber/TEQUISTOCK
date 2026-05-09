@@ -10,6 +10,8 @@ import { ProductosTable } from "@/components/productos/ProductosTable";
 import { Pagination } from "@/components/productos/Pagination";
 import { EmptyState } from "@/components/productos/EmptyState";
 import { ProductoModal } from "@/components/productos/ProductoModal";
+import { CategoriaModal } from "@/components/productos/CategoriaModal";
+import { DeleteConfirmModal } from "@/components/productos/DeleteConfirmModal";
 
 interface Props {
   productos: Producto[];
@@ -38,6 +40,8 @@ export default function ProductosClient({
   const [categorias, setCategorias] = useState<Categoria[]>(initialCategorias);
   const [showModal, setShowModal] = useState(false);
   const [editTarget, setEditTarget] = useState<Producto | null>(null);
+  const [showCatModal, setShowCatModal] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Producto | null>(null);
   const [, startNavTransition] = useTransition();
 
   // Sync categorias if server re-fetches with new list
@@ -105,21 +109,26 @@ export default function ProductosClient({
   }
 
   function handleDelete(p: Producto) {
-    if (!confirm(`¿Eliminar "${p.nombre}"? Esta acción no se puede deshacer.`)) return;
-    deleteProducto(p.id).then((res) => {
+    setDeleteTarget(p);
+  }
+
+  function confirmDelete() {
+    if (!deleteTarget) return;
+    deleteProducto(deleteTarget.id).then((res) => {
       if (res.error) { toast.error(res.error); return; }
       toast.success("Producto eliminado");
+      setDeleteTarget(null);
       router.refresh();
     });
   }
 
   return (
     <div style={{ padding: 28 }}>
-      {/* Header: search + filter + nuevo */}
-      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 22, flexWrap: "wrap" }}>
+      {/* Header: filters row */}
+      <div style={{ display: "flex", alignItems: "center", gap: 48, marginBottom: 22 }}>
 
         {/* Search */}
-        <div style={{ position: "relative", width: 240 }}>
+        <div style={{ position: "relative", width: 220, flexShrink: 0 }}>
           <Search
             size={15}
             style={{
@@ -137,6 +146,7 @@ export default function ProductosClient({
               borderRadius: 8, border: "1px solid hsl(var(--border))",
               backgroundColor: "hsl(var(--surface))", color: "hsl(var(--text-main))",
               outline: "none", fontFamily: "inherit",
+              boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
             }}
           />
           {searchInput && (
@@ -156,26 +166,46 @@ export default function ProductosClient({
         </div>
 
         {/* Categoría select */}
-        <select
-          value={initialCategoria}
-          onChange={(e) => handleCategoriaChange(e.target.value)}
-          style={{
-            width: 180, padding: "9px 32px 9px 12px", fontSize: 13,
-            borderRadius: 8, border: "1px solid hsl(var(--border))",
-            backgroundColor: "hsl(var(--surface))", color: "hsl(var(--text-main))",
-            outline: "none", appearance: "none", cursor: "pointer", fontFamily: "inherit",
-            backgroundImage: "url(\"data:image/svg+xml;charset=US-ASCII,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237A7068' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E\")",
-            backgroundRepeat: "no-repeat", backgroundPosition: "right 12px center",
-          }}
-        >
-          <option value="">Todas las categorías</option>
-          {categorias.map((c) => (
-            <option key={c.id} value={c.id}>{c.nombre}</option>
-          ))}
-        </select>
+        <div style={{ position: "relative", zIndex: 10, flexShrink: 0 }}>
+          <select
+            value={initialCategoria}
+            onChange={(e) => handleCategoriaChange(e.target.value)}
+            style={{
+              padding: "9px 32px 9px 12px", fontSize: 13,
+              borderRadius: 8, border: "1px solid hsl(var(--border))",
+              backgroundColor: "hsl(var(--surface))", color: "hsl(var(--text-main))",
+              outline: "none", appearance: "none", cursor: "pointer", fontFamily: "inherit",
+              backgroundImage: "url(\"data:image/svg+xml;charset=US-ASCII,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237A7068' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E\")",
+              backgroundRepeat: "no-repeat", backgroundPosition: "right 12px center",
+              boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+            }}
+          >
+            <option value="">Todas las categorías</option>
+            {categorias.map((c) => (
+              <option key={c.id} value={c.id}>{c.nombre}</option>
+            ))}
+          </select>
+        </div>
 
-        {/* Nuevo Producto */}
-        <div style={{ marginLeft: "auto" }}>
+        {/* Acciones */}
+        <div style={{ marginLeft: "auto", display: "flex", gap: 10, flexShrink: 0 }}>
+          <button
+            onClick={() => setShowCatModal(true)}
+            style={{
+              display: "flex", alignItems: "center", gap: 8,
+              padding: "9px 16px", fontSize: 13, fontWeight: 600,
+              color: "hsl(var(--text-sub))",
+              backgroundColor: "hsl(var(--surface))",
+              border: "1px solid hsl(var(--border))",
+              borderRadius: 8, cursor: "pointer",
+              fontFamily: "inherit", transition: "opacity 0.15s ease",
+            }}
+            onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.opacity = "0.8")}
+            onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.opacity = "1")}
+          >
+            <Plus size={15} />
+            Nueva Categoría
+          </button>
           <button
             onClick={openCreate}
             style={{
@@ -247,7 +277,7 @@ export default function ProductosClient({
         )}
       </div>
 
-      {/* Modal */}
+      {/* Modal producto */}
       <ProductoModal
         open={showModal}
         editTarget={editTarget}
@@ -257,9 +287,27 @@ export default function ProductosClient({
           setShowModal(false);
           router.refresh();
         }}
-        onCategoriaCreated={(newCat) => {
+      />
+
+      {/* Modal categoría */}
+      <CategoriaModal
+        open={showCatModal}
+        categorias={categorias}
+        onClose={() => setShowCatModal(false)}
+        onCreated={(newCat) => {
           setCategorias((prev) => [...prev, newCat].sort((a, b) => a.nombre.localeCompare(b.nombre)));
         }}
+        onDeleted={(id, refresh) => {
+          setCategorias((prev) => prev.filter((c) => c.id !== id));
+          if (refresh) router.refresh();
+        }}
+      />
+
+      {/* Modal eliminar */}
+      <DeleteConfirmModal
+        producto={deleteTarget}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTarget(null)}
       />
     </div>
   );

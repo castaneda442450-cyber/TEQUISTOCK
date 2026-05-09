@@ -123,6 +123,7 @@ export function Sidebar() {
             alt="TequiStock"
             width={36}
             height={36}
+            priority
             style={{ borderRadius: 8, objectFit: "cover" }}
           />
         </div>

@@ -197,24 +197,33 @@ export async function createCategoria(
 
 export async function deleteCategoria(
   id: string,
-): Promise<{ error: string | null }> {
+  targetCategoriaId?: string | null,
+): Promise<{ error: string | null; affectedCount?: number; newCategoria?: { id: string; nombre: string; color: string } }> {
   const supabase = sb();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "No autorizado" };
 
-  // Verificar que no haya productos usando esta categoría
+  // Contar productos usando esta categoría
   const { count } = await supabase
     .from("productos")
     .select("id", { count: "exact", head: true })
     .eq("categoria_id", id);
 
-  if (count && count > 0) {
-    return { error: `No se puede eliminar: ${count} producto(s) usan esta categoría` };
+  // Si hay productos vinculados y no se indicó destino, informar para que el usuario elija
+  if (count && count > 0 && targetCategoriaId === undefined) {
+    return { error: null, affectedCount: count };
+  }
+
+  // Reasignar productos al destino elegido
+  if (count && count > 0 && targetCategoriaId !== undefined) {
+    const { error: updateErr } = await supabase
+      .from("productos")
+      .update({ categoria_id: targetCategoriaId })
+      .eq("categoria_id", id);
+    if (updateErr) return { error: updateErr.message };
   }
 
   const { error } = await supabase.from("categorias").delete().eq("id", id);
   if (error) return { error: error.message };
 
   revalidatePath("/productos");
-  return { error: null };
+  return { error: null, affectedCount: 0 };
 }

@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import { AlertTriangle } from "lucide-react";
 import type { CriticalProductRow } from "@/types";
@@ -51,27 +53,7 @@ export function CriticalAlerts({ products }: CriticalAlertsProps) {
             href={`/productos?search=${encodeURIComponent(p.nombre)}`}
             style={{ textDecoration: "none" }}
           >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                background: "hsl(var(--surface-alt))",
-                border: "1px solid hsl(var(--border))",
-                borderRadius: 8,
-                padding: "5px 12px",
-                cursor: "pointer",
-                transition: "border-color 0.15s, box-shadow 0.15s",
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(186,48,38,0.5)";
-                (e.currentTarget as HTMLDivElement).style.boxShadow = "0 2px 8px rgba(186,48,38,0.10)";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(186,48,38,0.22)";
-                (e.currentTarget as HTMLDivElement).style.boxShadow = "none";
-              }}
-            >
+            <div className="critical-chip">
               <span style={{ fontSize: 12, fontWeight: 600, color: "hsl(var(--text-main))" }}>
                 {p.nombre}
               </span>

@@ -1,11 +1,18 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { cookies } from "next/headers";
 import { proveedorSchema, type ProveedorInput } from "@/lib/schemas/proveedor.schema";
 import { revalidatePath } from "next/cache";
 import type { Proveedor, OrdenCompra } from "@/types";
 
 const sb = () => createAdminClient();
+
+async function requireSession() {
+  const cookieStore = await cookies();
+  const session = cookieStore.get("tequistock_session");
+  return session?.value === "carlos_nieto_authenticated";
+}
 
 function escapeLike(input: string): string {
   return input.replace(/[\\%_]/g, (m) => `\\${m}`);
@@ -67,11 +74,8 @@ export async function getProveedorOrdenes(
 export async function createProveedor(
   input: ProveedorInput,
 ): Promise<{ data: Proveedor | null; error: string | null }> {
+  if (!await requireSession()) return { data: null, error: "No autorizado" };
   const supabase = sb();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { data: null, error: "No autorizado" };
 
   const parsed = proveedorSchema.safeParse(input);
   if (!parsed.success)
@@ -115,11 +119,8 @@ export async function updateProveedor(
   id: string,
   input: ProveedorInput,
 ): Promise<{ data: Proveedor | null; error: string | null }> {
+  if (!await requireSession()) return { data: null, error: "No autorizado" };
   const supabase = sb();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { data: null, error: "No autorizado" };
 
   const parsed = proveedorSchema.safeParse(input);
   if (!parsed.success)
@@ -169,11 +170,8 @@ export async function updateProveedor(
 export async function deleteProveedor(
   id: string,
 ): Promise<{ error: string | null }> {
+  if (!await requireSession()) return { error: "No autorizado" };
   const supabase = sb();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "No autorizado" };
 
   const { count } = await supabase
     .from("ordenes_compra")

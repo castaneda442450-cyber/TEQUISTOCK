@@ -1,16 +1,15 @@
 "use client";
 
-import { X, FileText, ExternalLink } from "lucide-react";
+import { X } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/format";
 import type { OrdenCompra } from "@/types";
 
 interface CompraDetailModalProps {
   orden: OrdenCompra | null;
   onClose: () => void;
-  onViewFactura: (path: string) => void;
 }
 
-export function CompraDetailModal({ orden, onClose, onViewFactura }: CompraDetailModalProps) {
+export function CompraDetailModal({ orden, onClose }: CompraDetailModalProps) {
   if (!orden) return null;
 
   const proveedor = orden.proveedor as any;
@@ -91,30 +90,22 @@ export function CompraDetailModal({ orden, onClose, onViewFactura }: CompraDetai
             ))}
           </div>
 
-          {/* Ver factura button */}
-          {orden.has_invoice && orden.invoice_url && (
-            <button
-              onClick={() => onViewFactura(orden.invoice_url!)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                marginBottom: 20,
-                padding: "8px 14px",
-                borderRadius: 8,
-                border: "1px solid hsl(var(--border))",
-                backgroundColor: "hsl(var(--green) / 0.08)",
-                color: "hsl(var(--green))",
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: "pointer",
-                fontFamily: "inherit",
-              }}
-            >
-              <FileText size={14} />
-              Ver factura
-              <ExternalLink size={12} style={{ opacity: 0.7 }} />
-            </button>
+          {/* Indicador factura */}
+          {orden.has_invoice && (
+            <div style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              marginBottom: 20,
+              padding: "6px 12px",
+              borderRadius: 99,
+              backgroundColor: "hsl(var(--green) / 0.1)",
+              color: "hsl(var(--green))",
+              fontSize: 12,
+              fontWeight: 600,
+            }}>
+              Con factura
+            </div>
           )}
 
           {/* Productos */}

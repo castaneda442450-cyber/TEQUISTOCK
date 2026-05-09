@@ -4,6 +4,7 @@ import { MERMA_TYPES } from "@/lib/constants";
 export const consumoSchema = z.object({
   product_id: z.string().uuid(),
   qty: z.number().positive("Cantidad debe ser positiva"),
+  fecha: z.string().optional(),
   notes: z.string().optional(),
 });
 
@@ -11,7 +12,8 @@ export const mermaSchema = z.object({
   product_id: z.string().uuid(),
   qty: z.number().positive("Cantidad debe ser positiva"),
   motivo_merma: z.enum(MERMA_TYPES as [string, ...string[]]),
-  notes: z.string().optional(),
+  notes: z.string().min(1, "Motivo requerido"),
+  fecha: z.string().optional(),
 });
 
 export type ConsumoInput = z.infer<typeof consumoSchema>;

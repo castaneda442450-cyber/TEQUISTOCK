@@ -52,8 +52,8 @@ export function RankingCard({
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 6 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: "#B0A89E" }}>#{i + 1}</span>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: "#1C1714", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: "hsl(var(--text-muted))" }}>#{i + 1}</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: "hsl(var(--text-main))", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {it.name}
                     </span>
                   </div>
@@ -63,7 +63,7 @@ export function RankingCard({
                   <div style={{ fontSize: 14, fontWeight: 700, color: accentColor, fontVariantNumeric: "tabular-nums" }}>
                     {formatCurrency(it.value)}
                   </div>
-                  <div style={{ fontSize: 11, color: "#B0A89E", marginTop: 1 }}>
+                  <div style={{ fontSize: 11, color: "hsl(var(--text-muted))", marginTop: 1 }}>
                     {total && total > 0
                       ? `${((it.value / total) * 100).toFixed(1)}%`
                       : it.sublabel}

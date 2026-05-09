@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import React, { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { ChevronDown, ChevronUp, Plus, Eye, Pencil, Trash2, FileText } from "lucide-react";
-import { deleteOrden, getFacturaSignedUrl } from "@/lib/actions/compras.actions";
+import { deleteOrden } from "@/lib/actions/compras.actions";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { CompraModal } from "@/components/compras/CompraModal";
 import { CompraDetailModal } from "@/components/compras/CompraDetailModal";
@@ -116,15 +116,6 @@ export default function ComprasClient({ ordenes: initial, proveedores, productos
       toast.success("Compra eliminada");
       closeModal();
     });
-  }
-
-  async function handleViewFactura(path: string) {
-    const res = await getFacturaSignedUrl(path);
-    if (res.url) {
-      window.open(res.url, "_blank");
-    } else {
-      toast.error("No se pudo obtener la factura");
-    }
   }
 
   const COL_WIDTHS = "32px 120px 140px 1fr 90px 110px 80px 100px";
@@ -255,9 +246,8 @@ export default function ComprasClient({ ordenes: initial, proveedores, productos
                 const rowBg = ri % 2 === 0 ? "hsl(var(--surface))" : "hsl(var(--surface-alt))";
 
                 return (
-                  <>
+                  <React.Fragment key={row.id}>
                     <tr
-                      key={row.id}
                       style={{
                         borderBottom: "1px solid hsl(var(--border))",
                         backgroundColor: rowBg,
@@ -358,7 +348,7 @@ export default function ComprasClient({ ordenes: initial, proveedores, productos
 
                     {/* Expanded detail row */}
                     {isExpanded && (
-                      <tr key={`${row.id}-detail`} style={{ backgroundColor: "hsl(var(--surface-alt))" }}>
+                      <tr style={{ backgroundColor: "hsl(var(--surface-alt))" }}>
                         <td colSpan={8} style={{ padding: "12px 24px 16px" }}>
                           <div style={{
                             fontSize: 11,
@@ -403,36 +393,30 @@ export default function ComprasClient({ ordenes: initial, proveedores, productos
                               );
                             })}
 
-                            {/* Ver factura en expanded */}
-                            {row.has_invoice && row.invoice_url && (
-                              <button
-                                onClick={() => handleViewFactura(row.invoice_url!)}
-                                style={{
-                                  alignSelf: "flex-start",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: 6,
-                                  marginTop: 4,
-                                  padding: "6px 12px",
-                                  borderRadius: 6,
-                                  border: "1px solid hsl(var(--green) / 0.3)",
-                                  backgroundColor: "hsl(var(--green) / 0.07)",
-                                  color: "hsl(var(--green))",
-                                  fontSize: 12,
-                                  fontWeight: 600,
-                                  cursor: "pointer",
-                                  fontFamily: "inherit",
-                                }}
-                              >
-                                <FileText size={13} />
-                                Ver factura
-                              </button>
+                            {/* Indicador factura */}
+                            {row.has_invoice && (
+                              <div style={{
+                                alignSelf: "flex-start",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 5,
+                                marginTop: 4,
+                                padding: "4px 10px",
+                                borderRadius: 99,
+                                backgroundColor: "hsl(var(--green) / 0.1)",
+                                color: "hsl(var(--green))",
+                                fontSize: 11,
+                                fontWeight: 600,
+                              }}>
+                                <FileText size={11} />
+                                Con factura
+                              </div>
                             )}
                           </div>
                         </td>
                       </tr>
                     )}
-                  </>
+                  </React.Fragment>
                 );
               })}
 
@@ -465,7 +449,6 @@ export default function ComprasClient({ ordenes: initial, proveedores, productos
       <CompraDetailModal
         orden={modal === "view" ? selected : null}
         onClose={closeModal}
-        onViewFactura={handleViewFactura}
       />
 
       <CompraDeleteModal

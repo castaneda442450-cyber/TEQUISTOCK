@@ -45,7 +45,7 @@ export async function getOrdenes(
 
   const { data, error } = await query;
   if (error) return { data: null, error: error.message };
-  return { data: data as unknown as OrdenCompra[], error: null };
+  return { data: (data as any[]).map(remapOrden), error: null };
 }
 
 export async function getOrdenById(
@@ -59,7 +59,18 @@ export async function getOrdenById(
     .eq("id", id)
     .single();
   if (error) return { data: null, error: error.message };
-  return { data: data as unknown as OrdenCompra, error: null };
+  return { data: remapOrden(data as any), error: null };
+}
+
+function remapOrden(row: any): OrdenCompra {
+  return {
+    ...row,
+    proveedor: row.proveedores ?? null,
+    detalles: (row.detalle_orden ?? []).map((d: any) => ({
+      ...d,
+      producto: d.productos ?? null,
+    })),
+  };
 }
 
 export async function createOrden(
@@ -71,6 +82,8 @@ export async function createOrden(
   const { supplier_id, fecha, detalles, has_invoice, invoice_url, folio: folioInput } = parsed.data;
   const total = detalles.reduce((s, d) => s + d.qty * d.price, 0);
   const folio = folioInput?.trim() || (await nextFolio());
+  // Normalize fecha to YYYY-MM-DD so comparisons are timezone-safe
+  const fechaNorm = fecha.slice(0, 10);
 
   // 1. Create order
   const { data: orden, error: oErr } = await sb()
@@ -78,7 +91,7 @@ export async function createOrden(
     .insert({
       folio,
       supplier_id,
-      fecha,
+      fecha: fechaNorm,
       total,
       has_invoice: has_invoice ?? false,
       invoice_url: invoice_url ?? null,
@@ -104,7 +117,7 @@ export async function createOrden(
         product_id: d.product_id,
         tipo: "entrada",
         qty: d.qty,
-        fecha,
+        fecha: fechaNorm,
         user_id: CARLOS_USER_ID,
         notes: `Compra ${folio}`,
         ref_id: orden.id,
@@ -130,7 +143,7 @@ export async function createOrden(
   revalidatePath("/compras");
   revalidatePath("/dashboard");
   revalidatePath("/productos");
-  return { data: orden as unknown as OrdenCompra, error: null };
+  return getOrdenById(orden.id);
 }
 
 export async function updateOrden(
@@ -214,7 +227,7 @@ export async function updateOrden(
   revalidatePath("/compras");
   revalidatePath("/dashboard");
   revalidatePath("/productos");
-  return { data: updated as unknown as OrdenCompra, error: null };
+  return getOrdenById(id);
 }
 
 export async function deleteOrden(id: string): Promise<{ error: string | null }> {
