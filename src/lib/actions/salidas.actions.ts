@@ -1,6 +1,7 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { requireAuth } from "@/lib/actions/auth.actions";
 import { consumoSchema, mermaSchema, type ConsumoInput, type MermaInput } from "@/lib/schemas/salida.schema";
 import { revalidatePath } from "next/cache";
 import type { Movimiento } from "@/types";
@@ -27,6 +28,8 @@ export async function getMovimientos(
 export async function createConsumo(
   input: ConsumoInput,
 ): Promise<{ data: Movimiento | null; error: string | null }> {
+  const authErr = await requireAuth();
+  if (authErr) return { data: null, error: authErr.error };
   const parsed = consumoSchema.safeParse(input);
   if (!parsed.success) return { data: null, error: "Datos inválidos" };
 
@@ -64,6 +67,8 @@ export async function createConsumo(
 export async function createMerma(
   input: MermaInput,
 ): Promise<{ data: Movimiento | null; error: string | null }> {
+  const authErr = await requireAuth();
+  if (authErr) return { data: null, error: authErr.error };
   const parsed = mermaSchema.safeParse(input);
   if (!parsed.success) return { data: null, error: "Datos inválidos" };
 
@@ -102,6 +107,8 @@ export async function createMerma(
 }
 
 export async function anularMovimiento(id: string): Promise<{ error: string | null }> {
+  const authErr = await requireAuth();
+  if (authErr) return { error: authErr.error };
   const { data: mov } = await sb()
     .from("movimientos")
     .select("tipo,qty,product_id,fecha")

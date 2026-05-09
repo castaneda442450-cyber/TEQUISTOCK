@@ -1,6 +1,7 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { requireAuth } from "@/lib/actions/auth.actions";
 import { productoSchema, type ProductoInput } from "@/lib/schemas/producto.schema";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -80,6 +81,8 @@ export async function getProductoById(
 export async function createProducto(
   input: ProductoInput,
 ): Promise<{ data: Producto | null; error: string | null }> {
+  const authErr = await requireAuth();
+  if (authErr) return { data: null, error: authErr.error };
   const parsed = productoSchema.safeParse(input);
   if (!parsed.success) return { data: null, error: "Datos inválidos" };
 
@@ -106,6 +109,8 @@ export async function updateProducto(
   id: string,
   input: ProductoInput,
 ): Promise<{ data: Producto | null; error: string | null }> {
+  const authErr = await requireAuth();
+  if (authErr) return { data: null, error: authErr.error };
   const parsed = productoSchema.safeParse(input);
   if (!parsed.success) return { data: null, error: "Datos inválidos" };
 
@@ -125,6 +130,8 @@ export async function updateProducto(
 export async function deleteProducto(
   id: string,
 ): Promise<{ error: string | null }> {
+  const authErr = await requireAuth();
+  if (authErr) return { error: authErr.error };
   const { count } = await sb()
     .from("movimientos")
     .select("*", { count: "exact", head: true })
@@ -173,6 +180,8 @@ export type CategoriaInput = z.infer<typeof categoriaSchema>;
 export async function createCategoria(
   input: CategoriaInput,
 ): Promise<{ data: { id: string; nombre: string; color: string } | null; error: string | null }> {
+  const authErr = await requireAuth();
+  if (authErr) return { data: null, error: authErr.error };
   const parsed = categoriaSchema.safeParse(input);
   if (!parsed.success) {
     return { data: null, error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
@@ -199,6 +208,8 @@ export async function deleteCategoria(
   id: string,
   targetCategoriaId?: string | null,
 ): Promise<{ error: string | null; affectedCount?: number; newCategoria?: { id: string; nombre: string; color: string } }> {
+  const authErr = await requireAuth();
+  if (authErr) return { error: authErr.error };
   const supabase = sb();
 
   // Contar productos usando esta categoría

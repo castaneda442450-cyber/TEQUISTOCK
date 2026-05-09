@@ -48,6 +48,17 @@ export async function signOut() {
   redirect("/login");
 }
 
+export async function requireAuth(): Promise<{ error: string } | null> {
+  try {
+    const supabase = await createServerClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "No autorizado" };
+    return null;
+  } catch {
+    return { error: "No autorizado" };
+  }
+}
+
 export async function getSession() {
   try {
     const supabase = await createServerClient();

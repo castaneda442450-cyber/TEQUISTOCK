@@ -1,6 +1,7 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { requireAuth } from "@/lib/actions/auth.actions";
 import { ordenSchema, updateOrdenSchema, type OrdenInput, type UpdateOrdenInput } from "@/lib/schemas/compra.schema";
 import { revalidatePath } from "next/cache";
 import type { OrdenCompra } from "@/types";
@@ -76,6 +77,8 @@ function remapOrden(row: any): OrdenCompra {
 export async function createOrden(
   input: OrdenInput,
 ): Promise<{ data: OrdenCompra | null; error: string | null }> {
+  const authErr = await requireAuth();
+  if (authErr) return { data: null, error: authErr.error };
   const parsed = ordenSchema.safeParse(input);
   if (!parsed.success) return { data: null, error: "Datos inválidos" };
 
@@ -150,6 +153,8 @@ export async function updateOrden(
   id: string,
   input: UpdateOrdenInput,
 ): Promise<{ data: OrdenCompra | null; error: string | null }> {
+  const authErr = await requireAuth();
+  if (authErr) return { data: null, error: authErr.error };
   const parsed = updateOrdenSchema.safeParse(input);
   if (!parsed.success) return { data: null, error: "Datos inválidos" };
 
@@ -231,7 +236,8 @@ export async function updateOrden(
 }
 
 export async function deleteOrden(id: string): Promise<{ error: string | null }> {
-  // Get order info for cleanup
+  const authErr = await requireAuth();
+  if (authErr) return { error: authErr.error };
   const { data: orden } = await sb()
     .from("ordenes_compra")
     .select("supplier_id,total,invoice_url")
@@ -275,6 +281,8 @@ export async function deleteOrden(id: string): Promise<{ error: string | null }>
 export async function uploadFactura(
   formData: FormData,
 ): Promise<{ path: string | null; error: string | null }> {
+  const authErr = await requireAuth();
+  if (authErr) return { path: null, error: authErr.error };
   const file = formData.get("file") as File | null;
   if (!file) return { path: null, error: "No se recibió archivo" };
 
@@ -292,6 +300,8 @@ export async function uploadFactura(
 }
 
 export async function deleteFactura(path: string): Promise<{ error: string | null }> {
+  const authErr = await requireAuth();
+  if (authErr) return { error: authErr.error };
   const { error } = await sb().storage.from("facturas").remove([path]);
   if (error) return { error: error.message };
   return { error: null };
