@@ -13,13 +13,14 @@ interface SearchParams {
 export default async function ComprasPage({
   searchParams,
 }: {
-  searchParams: SearchParams;
+  searchParams: Promise<SearchParams>;
 }) {
+  const params = await searchParams;
   const [{ data: ordenes }, { data: proveedores }, { data: productos }] = await Promise.all([
     getOrdenes({
-      desde: searchParams.desde,
-      hasta: searchParams.hasta,
-      supplier_id: searchParams.supplier_id,
+      desde: params.desde,
+      hasta: params.hasta,
+      supplier_id: params.supplier_id,
     }),
     getProveedores(),
     getProductos(),
@@ -31,9 +32,9 @@ export default async function ComprasPage({
       proveedores={(proveedores ?? []).filter((p) => p.activo)}
       productos={productos ?? []}
       initialFilters={{
-        desde: searchParams.desde ?? "",
-        hasta: searchParams.hasta ?? "",
-        supplier_id: searchParams.supplier_id ?? "",
+        desde: params.desde ?? "",
+        hasta: params.hasta ?? "",
+        supplier_id: params.supplier_id ?? "",
       }}
     />
   );
