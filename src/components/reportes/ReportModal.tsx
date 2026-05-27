@@ -492,13 +492,20 @@ export function ReportModal({ type, onClose }: ReportModalProps) {
   async function handleExportExcel() {
     if (!data) return;
     try {
-      const XLSX = await import("xlsx");
+      const ExcelJS = (await import("exceljs")).default;
+      const wb = new ExcelJS.Workbook();
+      const ws = wb.addWorksheet("Reporte");
       const sheetRows = buildSheetRows(data);
-      const ws = XLSX.utils.aoa_to_sheet(sheetRows);
-      ws["!cols"] = sheetRows[0]?.map(() => ({ wch: 22 }));
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Reporte");
-      XLSX.writeFile(wb, buildFilename(type, desde, hasta, "xlsx"));
+      ws.addRows(sheetRows);
+      ws.columns = sheetRows[0]?.map(() => ({ width: 22 })) ?? [];
+      const buf = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = buildFilename(type, desde, hasta, "xlsx");
+      a.click();
+      URL.revokeObjectURL(url);
     } catch (e) {
       toast.error("Error al exportar Excel");
       console.error(e);
