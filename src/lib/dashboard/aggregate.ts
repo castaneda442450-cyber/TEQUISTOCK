@@ -18,7 +18,7 @@ export interface ProductoRaw {
   stock_minimo: number;
   last_price: number | null;
   categoria_id: string;
-  categorias: { nombre: string } | { nombre: string }[] | null;
+  categorias: { nombre: string; color: string } | { nombre: string; color: string }[] | null;
 }
 
 export interface ProveedorRaw {
@@ -56,6 +56,7 @@ export interface ProductLookup {
   nombre: string;
   unidad: string;
   categoria: string;
+  categoriaColor: string;
   last_price: number;
 }
 
@@ -68,6 +69,7 @@ export function buildProductLookup(productos: ProductoRaw[]): Map<string, Produc
       nombre: p.nombre,
       unidad: p.unidad,
       categoria: cat?.nombre ?? "Sin categoría",
+      categoriaColor: cat?.color ?? "#888888",
       last_price: p.last_price ?? 0,
     });
   }
@@ -273,14 +275,15 @@ function parseLocalDate(dateStr: string): Date {
 export function aggregateGastoPorCategoria(
   orders: OrdenRaw[],
   products: Map<string, ProductLookup>,
-): Record<string, number> {
-  const out: Record<string, number> = {};
+): Record<string, { value: number; color: string }> {
+  const out: Record<string, { value: number; color: string }> = {};
   for (const o of orders) {
     for (const d of o.detalle_orden ?? []) {
       const p = products.get(d.product_id);
       if (!p) continue;
       const v = (d.qty ?? 0) * (d.price ?? 0);
-      out[p.categoria] = (out[p.categoria] ?? 0) + v;
+      if (!out[p.categoria]) out[p.categoria] = { value: 0, color: p.categoriaColor };
+      out[p.categoria].value += v;
     }
   }
   return out;

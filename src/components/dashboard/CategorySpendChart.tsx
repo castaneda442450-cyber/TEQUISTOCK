@@ -4,21 +4,20 @@ import "./ChartSetup";
 import { useMemo } from "react";
 import { Bar } from "react-chartjs-2";
 import type { ChartOptions } from "chart.js";
-import { CATEGORY_COLORS } from "@/lib/constants";
 import { formatCurrency } from "@/lib/format";
 
 interface CategorySpendChartProps {
-  data: Record<string, number>;
+  data: Record<string, { value: number; color: string }>;
 }
 
 export function CategorySpendChart({ data }: CategorySpendChartProps) {
   const chartData = useMemo(() => {
     const sorted = Object.entries(data)
-      .filter(([, v]) => v > 0)
-      .sort((a, b) => b[1] - a[1]);
+      .filter(([, v]) => v.value > 0)
+      .sort((a, b) => b[1].value - a[1].value);
     const labels = sorted.map(([k]) => k);
-    const values = sorted.map(([, v]) => v);
-    const colors = labels.map((c) => CATEGORY_COLORS[c] ?? "#888");
+    const values = sorted.map(([, v]) => v.value);
+    const colors = sorted.map(([, v]) => v.color);
     return {
       labels,
       datasets: [

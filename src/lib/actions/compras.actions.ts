@@ -1,6 +1,7 @@
 "use server";
 
 import { createServerClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAuth } from "@/lib/actions/auth.actions";
 import { checkRateLimit } from "@/lib/ratelimit";
 import { ordenSchema, updateOrdenSchema, type OrdenInput, type UpdateOrdenInput } from "@/lib/schemas/compra.schema";
@@ -137,7 +138,14 @@ export async function updateOrden(
   if (!currentOrden) return { data: null, error: "Orden no encontrada" };
 
   // 1. Delete old movimientos entrada (trigger reverses stock)
-  await supabase.from("movimientos").delete().eq("ref_id", id).eq("tipo", "entrada");
+  // Uses admin client because RLS on movimientos has no DELETE policy
+  const adminClient = createAdminClient();
+  const { error: delMovErr } = await adminClient
+    .from("movimientos")
+    .delete()
+    .eq("ref_id", id)
+    .eq("tipo", "entrada");
+  if (delMovErr) return { data: null, error: delMovErr.message };
 
   // 2. Delete old detalles
   await supabase.from("detalle_orden").delete().eq("orden_id", id);

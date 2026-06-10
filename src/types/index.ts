@@ -162,6 +162,6 @@ export interface DashboardData {
   topMerma: TopMermaRow[];
   criticalProducts: CriticalProductRow[];
   spendingTrend: SpendingTrendPoint[];
-  gastoPorCategoria: Record<string, number>;
+  gastoPorCategoria: Record<string, { value: number; color: string }>;
   filterMeta: FilterMeta;
 }

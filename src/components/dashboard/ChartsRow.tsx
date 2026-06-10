@@ -6,7 +6,7 @@ import type { SpendingTrendPoint } from "@/types";
 
 interface ChartsRowProps {
   trend: SpendingTrendPoint[];
-  gastoPorCategoria: Record<string, number>;
+  gastoPorCategoria: Record<string, { value: number; color: string }>;
 }
 
 export function ChartsRow({ trend, gastoPorCategoria }: ChartsRowProps) {

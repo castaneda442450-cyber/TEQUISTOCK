@@ -34,7 +34,7 @@ export async function getDashboardData(filters: DashboardFilters): Promise<Dashb
   const productosQuery = supabase
     .from("productos")
     .select(
-      "id, nombre, unidad, stock_actual, stock_minimo, last_price, categoria_id, categorias!inner(nombre)",
+      "id, nombre, unidad, stock_actual, stock_minimo, last_price, categoria_id, categorias!inner(nombre, color)",
     );
 
   const proveedoresQuery = supabase.from("proveedores").select("id, company");
@@ -180,7 +180,7 @@ function emptyDashboardData(filters: DashboardFilters): DashboardData {
     topMerma: [],
     criticalProducts: [],
     spendingTrend: [],
-    gastoPorCategoria: {},
+    gastoPorCategoria: {} as Record<string, { value: number; color: string }>,
     filterMeta,
   };
 }
