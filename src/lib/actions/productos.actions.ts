@@ -1,13 +1,11 @@
 "use server";
 
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createServerClient } from "@/lib/supabase/server";
 import { requireAuth } from "@/lib/actions/auth.actions";
 import { productoSchema, type ProductoInput } from "@/lib/schemas/producto.schema";
 import { categoriaSchema, type CategoriaInput } from "@/lib/schemas/categoria.schema";
 import { revalidatePath } from "next/cache";
 import type { Producto } from "@/types";
-
-const sb = () => createAdminClient();
 
 const PER_PAGE = 10;
 
@@ -33,10 +31,14 @@ export async function getProductos(
   params: GetProductosParams = {},
 ): Promise<GetProductosResult> {
   const page = Math.max(1, params.page ?? 1);
+  const auth = await requireAuth();
+  if (auth.error) return { data: [], count: 0, totalPages: 0, page, error: auth.error };
+  const supabase = await createServerClient();
+
   const from = (page - 1) * PER_PAGE;
   const to = from + PER_PAGE - 1;
 
-  let query = sb()
+  let query = supabase
     .from("productos")
     .select("*, categorias:categoria_id(id,nombre,color)", { count: "exact" });
 
@@ -66,10 +68,25 @@ export async function getProductos(
   };
 }
 
+export async function getAllProductos(): Promise<{ data: Producto[]; error: string | null }> {
+  const auth = await requireAuth();
+  if (auth.error) return { data: [], error: auth.error };
+  const supabase = await createServerClient();
+  const { data, error } = await supabase
+    .from("productos")
+    .select("*, categorias:categoria_id(id,nombre,color)")
+    .order("nombre");
+  if (error) return { data: [], error: error.message };
+  return { data: (data ?? []) as unknown as Producto[], error: null };
+}
+
 export async function getProductoById(
   id: string,
 ): Promise<{ data: Producto | null; error: string | null }> {
-  const { data, error } = await sb()
+  const auth = await requireAuth();
+  if (auth.error) return { data: null, error: auth.error };
+  const supabase = await createServerClient();
+  const { data, error } = await supabase
     .from("productos")
     .select("*, categorias:categoria_id(id,nombre,color)")
     .eq("id", id)
@@ -81,19 +98,20 @@ export async function getProductoById(
 export async function createProducto(
   input: ProductoInput,
 ): Promise<{ data: Producto | null; error: string | null }> {
-  const authErr = await requireAuth();
-  if (authErr) return { data: null, error: authErr.error };
+  const auth = await requireAuth();
+  if (auth.error) return { data: null, error: auth.error };
   const parsed = productoSchema.safeParse(input);
   if (!parsed.success) return { data: null, error: "Datos inválidos" };
+  const supabase = await createServerClient();
 
-  const { count } = await sb()
+  const { count } = await supabase
     .from("productos")
     .select("id", { count: "exact", head: true })
     .ilike("nombre", parsed.data.nombre);
   if (count && count > 0)
     return { data: null, error: `Ya existe un producto con el nombre "${parsed.data.nombre}"` };
 
-  const { data, error } = await sb()
+  const { data, error } = await supabase
     .from("productos")
     .insert({ ...parsed.data, stock_actual: 0 })
     .select("*, categorias:categoria_id(id,nombre,color)")
@@ -109,12 +127,13 @@ export async function updateProducto(
   id: string,
   input: ProductoInput,
 ): Promise<{ data: Producto | null; error: string | null }> {
-  const authErr = await requireAuth();
-  if (authErr) return { data: null, error: authErr.error };
+  const auth = await requireAuth();
+  if (auth.error) return { data: null, error: auth.error };
   const parsed = productoSchema.safeParse(input);
   if (!parsed.success) return { data: null, error: "Datos inválidos" };
+  const supabase = await createServerClient();
 
-  const { data, error } = await sb()
+  const { data, error } = await supabase
     .from("productos")
     .update(parsed.data)
     .eq("id", id)
@@ -130,16 +149,17 @@ export async function updateProducto(
 export async function deleteProducto(
   id: string,
 ): Promise<{ error: string | null }> {
-  const authErr = await requireAuth();
-  if (authErr) return { error: authErr.error };
-  const { count } = await sb()
+  const auth = await requireAuth();
+  if (auth.error) return { error: auth.error };
+  const supabase = await createServerClient();
+  const { count } = await supabase
     .from("movimientos")
     .select("*", { count: "exact", head: true })
     .eq("product_id", id);
   if (count && count > 0)
     return { error: "No puedes eliminar un producto con movimientos registrados" };
 
-  const { error } = await sb().from("productos").delete().eq("id", id);
+  const { error } = await supabase.from("productos").delete().eq("id", id);
   if (error) return { error: error.message };
 
   revalidatePath("/productos");
@@ -147,20 +167,11 @@ export async function deleteProducto(
   return { error: null };
 }
 
-export async function getAllProductos(): Promise<{
-  data: Producto[];
-  error: string | null;
-}> {
-  const { data, error } = await sb()
-    .from("productos")
-    .select("*, categorias:categoria_id(id,nombre,color)")
-    .order("nombre");
-  if (error) return { data: [], error: error.message };
-  return { data: (data ?? []) as unknown as Producto[], error: null };
-}
-
 export async function getCategorias() {
-  const { data, error } = await sb()
+  const auth = await requireAuth();
+  if (auth.error) return { data: null, error: auth.error };
+  const supabase = await createServerClient();
+  const { data, error } = await supabase
     .from("categorias")
     .select("id,nombre,color,created_at")
     .order("nombre");
@@ -173,14 +184,15 @@ export type { CategoriaInput };
 export async function createCategoria(
   input: CategoriaInput,
 ): Promise<{ data: { id: string; nombre: string; color: string } | null; error: string | null }> {
-  const authErr = await requireAuth();
-  if (authErr) return { data: null, error: authErr.error };
+  const auth = await requireAuth();
+  if (auth.error) return { data: null, error: auth.error };
   const parsed = categoriaSchema.safeParse(input);
   if (!parsed.success) {
     return { data: null, error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   }
+  const supabase = await createServerClient();
 
-  const { data, error } = await sb()
+  const { data, error } = await supabase
     .from("categorias")
     .insert(parsed.data)
     .select("id,nombre,color")
@@ -201,9 +213,9 @@ export async function deleteCategoria(
   id: string,
   targetCategoriaId?: string | null,
 ): Promise<{ error: string | null; affectedCount?: number; newCategoria?: { id: string; nombre: string; color: string } }> {
-  const authErr = await requireAuth();
-  if (authErr) return { error: authErr.error };
-  const supabase = sb();
+  const auth = await requireAuth();
+  if (auth.error) return { error: auth.error };
+  const supabase = await createServerClient();
 
   // Contar productos usando esta categoría
   const { count } = await supabase

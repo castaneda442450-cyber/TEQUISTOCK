@@ -61,7 +61,32 @@
       "Bash(kill 3448)",
       "Bash(git -C \"d:/tequistock\" status --porcelain)",
       "Bash(xargs sha256sum)",
-      "PowerShell(Remove-Item -Recurse -Force \"d:\\\\tequistock\\\\imagenes\" -Confirm:$false)"
+      "PowerShell(Remove-Item -Recurse -Force \"d:\\\\tequistock\\\\imagenes\" -Confirm:$false)",
+      "PowerShell(npx sharp-cli --version)",
+      "PowerShell(python --version)",
+      "PowerShell(magick --version)",
+      "PowerShell(npx sharp-cli -i \"d:\\\\tequistock\\\\public\\\\imagenLogin.png\" -o \"d:\\\\tequistock\\\\public\\\\\" --format webp --quality 82)",
+      "PowerShell(\\(Get-Item \"d:\\\\tequistock\\\\public\\\\imagenLogin.png\"\\).Length / 1MB; \\(Get-Item \"d:\\\\tequistock\\\\public\\\\imagenLogin.webp\"\\).Length / 1MB)",
+      "mcp__claude_ai_Supabase__list_projects",
+      "mcp__claude_ai_Supabase__execute_sql",
+      "PowerShell(Stop-Process -Name \"node\" -Force -ErrorAction SilentlyContinue)",
+      "Bash(Get-ChildItem -Path \"d:\\\\tequistock\" -Recurse -Directory -Name)",
+      "Bash(Select-Object -First 20)",
+      "Bash(python -c \"import json,sys; p=json.load\\(sys.stdin\\); print\\('deps:', len\\(p.get\\('dependencies',{}\\)\\)\\); print\\('devdeps:', len\\(p.get\\('devDependencies',{}\\)\\)\\); [print\\(k,v\\) for k,v in p.get\\('dependencies',{}\\).items\\(\\)]\")",
+      "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d, indent=2\\)\\)\")",
+      "PowerShell(Stop-Process -Force -Confirm:$false)",
+      "Bash(grep -iE \"\\(eyJ[A-Za-z0-9_-]{20,}|sk_live|sk_test_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|password\\\\s*=\\\\s*[\\\\\"'][^\\\\\"']{4,}\\)\")",
+      "Bash(npm audit *)",
+      "Bash(git check-ignore *)",
+      "Bash(cat \"/c/Users/diana/AppData/Local/Temp/claude/d--tequistock/9811db34-4543-4cb6-bd11-54e5343c84e3/tasks/br7fnj6f8.output\")",
+      "Read(//c/Users/diana/AppData/Local/Temp/claude/d--tequistock/9811db34-4543-4cb6-bd11-54e5343c84e3/tasks/**)",
+      "mcp__claude_ai_Supabase__apply_migration",
+      "Bash(npm ls *)",
+      "Bash(node node_modules/typescript/bin/tsc --noEmit -p .)",
+      "PowerShell(Get-Process node -ErrorAction SilentlyContinue)",
+      "Bash(node node_modules/typescript/lib/tsc.js --noEmit -p .)",
+      "Bash(Remove-Item -Recurse -Force .next -ErrorAction SilentlyContinue)",
+      "PowerShell($env:npm_config_prefer_offline = \"false\"; npm install --no-audit --no-fund --loglevel=warn 2>&1)"
     ]
   }
 }

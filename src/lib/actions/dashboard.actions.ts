@@ -1,6 +1,7 @@
 "use server";
 
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createServerClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/actions/auth.actions";
 import { isMatchingWeekday, resolveDateRange } from "@/lib/dashboard/filters";
 import {
   aggregateCriticalProducts,
@@ -20,7 +21,9 @@ import {
 import type { DashboardData, DashboardFilters, FilterMeta } from "@/types";
 
 export async function getDashboardData(filters: DashboardFilters): Promise<DashboardData> {
-  const supabase = createAdminClient();
+  const auth = await requireAuth();
+  if (auth.error) return emptyDashboardData(filters);
+  const supabase = await createServerClient();
   const range = resolveDateRange(filters);
 
   // For 'dia' mode we cannot filter by weekday in SQL cleanly, so we fetch all

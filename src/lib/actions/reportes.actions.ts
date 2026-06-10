@@ -1,8 +1,9 @@
 "use server";
 
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createServerClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/actions/auth.actions";
 
-const sb = () => createAdminClient();
+const sb = async () => createServerClient();
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -71,8 +72,11 @@ export async function getGastosPorProducto(
   desde: string,
   hasta: string,
 ): Promise<{ data: GastoProductoResult | null; error: string | null }> {
+  const auth = await requireAuth();
+  if (auth.error) return { data: null, error: auth.error };
+  const supabase = await sb();
   // Step 1: get order IDs in date range
-  let ordenQuery = sb()
+  let ordenQuery = supabase
     .from("ordenes_compra")
     .select("id")
     .order("fecha", { ascending: false });
@@ -89,7 +93,7 @@ export async function getGastosPorProducto(
   const ordenIds = ordenes.map((o) => o.id);
 
   // Step 2: get line items for those orders
-  const { data: detalles, error: dErr } = await sb()
+  const { data: detalles, error: dErr } = await supabase
     .from("detalle_orden")
     .select(
       "qty, price, product_id, productos:product_id(nombre, categorias:categoria_id(nombre))",
@@ -156,7 +160,10 @@ export async function getGastosPorProveedor(
   desde: string,
   hasta: string,
 ): Promise<{ data: GastoProveedorResult | null; error: string | null }> {
-  let query = sb()
+  const auth = await requireAuth();
+  if (auth.error) return { data: null, error: auth.error };
+  const supabase = await sb();
+  let query = supabase
     .from("ordenes_compra")
     .select(
       "id, supplier_id, total, proveedores:supplier_id(company, contact), detalle_orden(product_id)",
@@ -230,7 +237,10 @@ export async function getMermaAnalisis(
   desde: string,
   hasta: string,
 ): Promise<{ data: MermaResult | null; error: string | null }> {
-  let query = sb()
+  const auth = await requireAuth();
+  if (auth.error) return { data: null, error: auth.error };
+  const supabase = await sb();
+  let query = supabase
     .from("movimientos")
     .select(
       "id, product_id, qty, value_lost, motivo_merma, productos:product_id(nombre, categorias:categoria_id(nombre))",
@@ -310,7 +320,10 @@ export async function getMovimientosReporte(
   desde: string,
   hasta: string,
 ): Promise<{ data: MovimientosResult | null; error: string | null }> {
-  let query = sb()
+  const auth = await requireAuth();
+  if (auth.error) return { data: null, error: auth.error };
+  const supabase = await sb();
+  let query = supabase
     .from("movimientos")
     .select(
       "id, tipo, qty, fecha, notes, ref_id, product_id, productos:product_id(nombre)",

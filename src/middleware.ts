@@ -5,7 +5,10 @@ const PROTECTED = ["/dashboard", "/productos", "/proveedores", "/compras", "/sal
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const response = NextResponse.next();
+
+  // Pass a mutable response into the client so refreshed session cookies
+  // are written back to the browser on every request.
+  let response = NextResponse.next({ request });
 
   const supabase = createMiddlewareClient(request, response);
   const { data: { user } } = await supabase.auth.getUser();
@@ -14,15 +17,21 @@ export async function middleware(request: NextRequest) {
   const isProtected = PROTECTED.some((p) => pathname === p || pathname.startsWith(p + "/"));
 
   if (pathname === "/") {
-    return NextResponse.redirect(new URL(isAuthed ? "/dashboard" : "/login", request.url));
+    const redirect = NextResponse.redirect(new URL(isAuthed ? "/dashboard" : "/login", request.url));
+    response.cookies.getAll().forEach((c) => redirect.cookies.set(c.name, c.value));
+    return redirect;
   }
 
   if (isProtected && !isAuthed) {
-    return NextResponse.redirect(new URL("/login", request.url));
+    const redirect = NextResponse.redirect(new URL("/login", request.url));
+    response.cookies.getAll().forEach((c) => redirect.cookies.set(c.name, c.value));
+    return redirect;
   }
 
   if (pathname === "/login" && isAuthed) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    const redirect = NextResponse.redirect(new URL("/dashboard", request.url));
+    response.cookies.getAll().forEach((c) => redirect.cookies.set(c.name, c.value));
+    return redirect;
   }
 
   return response;

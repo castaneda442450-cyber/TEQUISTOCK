@@ -15,9 +15,10 @@ export async function signIn(input: z.infer<typeof loginSchema>) {
     }
 
     const headersList = await headers();
-    const ip = headersList.get("x-forwarded-for") || "unknown";
+    const xff = headersList.get("x-forwarded-for") ?? "";
+    const ip = xff.split(",")[0]?.trim() || headersList.get("x-real-ip") || `anon-${parsed.data.username}`;
 
-    const rateLimit = await checkRateLimit(ip);
+    const rateLimit = await checkRateLimit(`login:${ip}`);
     if (!rateLimit.success) {
       return { error: "Demasiados intentos. Intenta de nuevo en 15 minutos." };
     }
@@ -48,12 +49,12 @@ export async function signOut() {
   redirect("/login");
 }
 
-export async function requireAuth(): Promise<{ error: string } | null> {
+export async function requireAuth(): Promise<{ error: string; userId?: undefined } | { error?: undefined; userId: string }> {
   try {
     const supabase = await createServerClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { error: "No autorizado" };
-    return null;
+    return { userId: user.id };
   } catch {
     return { error: "No autorizado" };
   }

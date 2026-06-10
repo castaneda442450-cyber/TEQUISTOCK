@@ -25,10 +25,11 @@ const C = {
 
 // ─── Input reutilizable ───────────────────────────────────────────────────────
 function Field({
-  id, label, type, placeholder, icon: Icon, error, reg, right,
+  id, label, type, placeholder, icon: Icon, error, reg, right, autoComplete,
 }: {
   id: string; label: string; type: string; placeholder: string;
   icon: React.ElementType; error?: string; reg: object; right?: React.ReactNode;
+  autoComplete?: string;
 }) {
   const [focused, setFocused] = useState(false);
   const borderColor = error ? "#EF4444" : focused ? C.terracota : C.border;
@@ -48,6 +49,10 @@ function Field({
           id={id}
           type={type}
           placeholder={placeholder}
+          autoComplete={autoComplete ?? "off"}
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
           suppressHydrationWarning
           {...reg}
           onFocus={() => setFocused(true)}
@@ -109,13 +114,34 @@ function LoginForm() {
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} noValidate>
+    <form onSubmit={handleSubmit(onSubmit)} noValidate autoComplete="off">
+      {/* Inputs señuelo: muchos navegadores ignoran autoComplete="off" en formularios de login.
+          Estos campos invisibles absorben el autofill y dejan limpios los reales. */}
+      <input
+        type="text"
+        name="fakeusernameremembered"
+        autoComplete="username"
+        tabIndex={-1}
+        aria-hidden="true"
+        style={{ position: "absolute", opacity: 0, height: 0, width: 0, pointerEvents: "none" }}
+      />
+      <input
+        type="password"
+        name="fakepasswordremembered"
+        autoComplete="current-password"
+        tabIndex={-1}
+        aria-hidden="true"
+        style={{ position: "absolute", opacity: 0, height: 0, width: 0, pointerEvents: "none" }}
+      />
+
       <Field id="username" label="Usuario" type="email"
         placeholder="correo@ejemplo.com" icon={User}
+        autoComplete="off"
         error={errors.username?.message} reg={register("username")} />
 
       <Field id="password" label="Contraseña" type={showPass ? "text" : "password"}
         placeholder="••••••••" icon={Lock}
+        autoComplete="new-password"
         error={errors.password?.message} reg={register("password")}
         right={
           <button type="button" onClick={() => setShowPass(p => !p)}

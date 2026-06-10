@@ -1,6 +1,6 @@
 import { getOrdenes } from "@/lib/actions/compras.actions";
 import { getProveedores } from "@/lib/actions/proveedores.actions";
-import { getProductos } from "@/lib/actions/productos.actions";
+import { getAllProductos } from "@/lib/actions/productos.actions";
 import ComprasClient from "./ComprasClient";
 
 interface SearchParams {
@@ -23,7 +23,7 @@ export default async function ComprasPage({
       supplier_id: params.supplier_id,
     }),
     getProveedores(),
-    getProductos(),
+    getAllProductos(),
   ]);
 
   return (

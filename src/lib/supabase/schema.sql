@@ -83,22 +83,36 @@ CREATE TABLE public.movimientos (
   created_at timestamp DEFAULT now()
 );
 
--- TRIGGER: actualizar_stock
+-- TRIGGER: actualizar_stock (atomic, prevents negative stock via FOR UPDATE lock)
 CREATE OR REPLACE FUNCTION actualizar_stock()
 RETURNS TRIGGER AS $$
+DECLARE
+  current_stock integer;
 BEGIN
   IF NEW.tipo = 'entrada' THEN
     UPDATE public.productos
-    SET stock_actual = stock_actual + NEW.qty
-    WHERE id = NEW.product_id;
+      SET stock_actual = stock_actual + NEW.qty
+      WHERE id = NEW.product_id;
   ELSIF NEW.tipo IN ('salida', 'merma') THEN
+    SELECT stock_actual INTO current_stock
+      FROM public.productos
+      WHERE id = NEW.product_id
+      FOR UPDATE;
+    IF current_stock < NEW.qty THEN
+      RAISE EXCEPTION 'Stock insuficiente: disponible=%, solicitado=%', current_stock, NEW.qty
+        USING ERRCODE = 'P0001';
+    END IF;
     UPDATE public.productos
-    SET stock_actual = stock_actual - NEW.qty
-    WHERE id = NEW.product_id;
+      SET stock_actual = stock_actual - NEW.qty
+      WHERE id = NEW.product_id;
   END IF;
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+
+-- Constraint: stock_actual can never go negative
+ALTER TABLE public.productos
+  ADD CONSTRAINT productos_stock_non_negative CHECK (stock_actual >= 0);
 
 CREATE TRIGGER trigger_actualizar_stock
 AFTER INSERT ON public.movimientos
@@ -115,90 +129,106 @@ ALTER TABLE public.detalle_orden ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.movimientos ENABLE ROW LEVEL SECURITY;
 
 -- RLS POLICIES
--- SELECT para todos los usuarios autenticados
+-- categorias: full CRUD para authenticated
 CREATE POLICY "SELECT categorias" ON public.categorias
   FOR SELECT
-  USING (auth.role() = 'authenticated_user');
+  USING (auth.role() = 'authenticated');
+
+CREATE POLICY "INSERT categorias" ON public.categorias
+  FOR INSERT
+  WITH CHECK (auth.role() = 'authenticated');
+
+CREATE POLICY "UPDATE categorias" ON public.categorias
+  FOR UPDATE
+  USING (auth.role() = 'authenticated');
+
+CREATE POLICY "DELETE categorias" ON public.categorias
+  FOR DELETE
+  USING (auth.role() = 'authenticated');
 
 CREATE POLICY "SELECT productos" ON public.productos
   FOR SELECT
-  USING (auth.role() = 'authenticated_user');
+  USING (auth.role() = 'authenticated');
 
 CREATE POLICY "SELECT proveedores" ON public.proveedores
   FOR SELECT
-  USING (auth.role() = 'authenticated_user');
+  USING (auth.role() = 'authenticated');
 
 CREATE POLICY "SELECT proveedor_productos" ON public.proveedor_productos
   FOR SELECT
-  USING (auth.role() = 'authenticated_user');
+  USING (auth.role() = 'authenticated');
 
 CREATE POLICY "SELECT ordenes_compra" ON public.ordenes_compra
   FOR SELECT
-  USING (auth.role() = 'authenticated_user');
+  USING (auth.role() = 'authenticated');
 
 CREATE POLICY "SELECT detalle_orden" ON public.detalle_orden
   FOR SELECT
-  USING (auth.role() = 'authenticated_user');
+  USING (auth.role() = 'authenticated');
 
 CREATE POLICY "SELECT movimientos" ON public.movimientos
   FOR SELECT
-  USING (auth.role() = 'authenticated_user');
+  USING (auth.role() = 'authenticated');
 
 -- INSERT
 CREATE POLICY "INSERT productos" ON public.productos
   FOR INSERT
-  WITH CHECK (auth.role() = 'authenticated_user');
+  WITH CHECK (auth.role() = 'authenticated');
 
 CREATE POLICY "INSERT proveedores" ON public.proveedores
   FOR INSERT
-  WITH CHECK (auth.role() = 'authenticated_user');
+  WITH CHECK (auth.role() = 'authenticated');
 
 CREATE POLICY "INSERT proveedor_productos" ON public.proveedor_productos
   FOR INSERT
-  WITH CHECK (auth.role() = 'authenticated_user');
+  WITH CHECK (auth.role() = 'authenticated');
 
 CREATE POLICY "INSERT ordenes_compra" ON public.ordenes_compra
   FOR INSERT
-  WITH CHECK (auth.role() = 'authenticated_user');
+  WITH CHECK (auth.role() = 'authenticated');
 
 CREATE POLICY "INSERT detalle_orden" ON public.detalle_orden
   FOR INSERT
-  WITH CHECK (auth.role() = 'authenticated_user');
+  WITH CHECK (auth.role() = 'authenticated');
 
 CREATE POLICY "INSERT movimientos" ON public.movimientos
   FOR INSERT
-  WITH CHECK (auth.role() = 'authenticated_user');
+  WITH CHECK (auth.role() = 'authenticated');
 
 -- UPDATE (solo en tablas específicas)
 CREATE POLICY "UPDATE productos" ON public.productos
   FOR UPDATE
-  USING (auth.role() = 'authenticated_user');
+  USING (auth.role() = 'authenticated');
 
 CREATE POLICY "UPDATE proveedores" ON public.proveedores
   FOR UPDATE
-  USING (auth.role() = 'authenticated_user');
+  USING (auth.role() = 'authenticated');
 
 CREATE POLICY "UPDATE ordenes_compra" ON public.ordenes_compra
   FOR UPDATE
-  USING (auth.role() = 'authenticated_user');
+  USING (auth.role() = 'authenticated');
 
 CREATE POLICY "UPDATE proveedor_productos" ON public.proveedor_productos
   FOR UPDATE
-  USING (auth.role() = 'authenticated_user');
+  USING (auth.role() = 'authenticated');
 
--- DELETE bloqueado en movimientos (no hay policy)
+-- DELETE bloqueado en movimientos (no hay policy — audit log inmutable)
 -- DELETE permitido en otras tablas
+CREATE POLICY "DELETE productos" ON public.productos
+  FOR DELETE
+  USING (auth.role() = 'authenticated');
+
 CREATE POLICY "DELETE proveedores" ON public.proveedores
   FOR DELETE
-  USING (auth.role() = 'authenticated_user');
+  USING (auth.role() = 'authenticated');
 
 CREATE POLICY "DELETE ordenes_compra" ON public.ordenes_compra
   FOR DELETE
-  USING (auth.role() = 'authenticated_user');
+  USING (auth.role() = 'authenticated');
 
 CREATE POLICY "DELETE proveedor_productos" ON public.proveedor_productos
   FOR DELETE
-  USING (auth.role() = 'authenticated_user');
+  USING (auth.role() = 'authenticated');
 
 -- REALTIME
 ALTER PUBLICATION supabase_realtime ADD TABLE public.movimientos;

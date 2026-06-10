@@ -107,7 +107,7 @@ export function aggregateMetrics(opts: {
   const mermaPrior = sumMermas(opts.mermasPrior);
 
   const productosCriticos = opts.productos.filter(
-    (p) => (p.stock_actual ?? 0) <= (p.stock_minimo ?? 0),
+    (p) => (p.stock_actual ?? 0) < (p.stock_minimo ?? 0),
   ).length;
 
   return {
@@ -214,7 +214,7 @@ export function aggregateTopMerma(
 
 export function aggregateCriticalProducts(productos: ProductoRaw[]): CriticalProductRow[] {
   return productos
-    .filter((p) => (p.stock_actual ?? 0) <= (p.stock_minimo ?? 0))
+    .filter((p) => (p.stock_actual ?? 0) < (p.stock_minimo ?? 0))
     .map((p) => ({
       id: p.id,
       nombre: p.nombre,

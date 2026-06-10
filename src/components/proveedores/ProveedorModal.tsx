@@ -27,6 +27,7 @@ export function ProveedorModal({
 }: ProveedorModalProps) {
   const [isPending, startTransition] = useTransition();
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
+  const [productFilter, setProductFilter] = useState<"all" | "selected" | "unassigned">("all");
 
   const {
     register,
@@ -47,6 +48,7 @@ export function ProveedorModal({
 
   useEffect(() => {
     if (!open) return;
+    setProductFilter("all");
     if (editTarget) {
       setSelectedProductIds(editTarget.producto_ids ?? []);
       reset({
@@ -219,33 +221,87 @@ export function ProveedorModal({
 
             {/* Productos que surte */}
             <div>
-              <label style={{
-                display: "block",
-                fontSize: 11,
-                fontWeight: 600,
-                textTransform: "uppercase",
-                letterSpacing: "0.04em",
-                color: "hsl(var(--text-sub))",
-                marginBottom: 8,
-              }}>
-                Productos que surte
-              </label>
+              {/* Header con label y tabs */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                <label style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.04em",
+                  color: "hsl(var(--text-sub))",
+                }}>
+                  Productos que surte
+                </label>
+                <div style={{ display: "flex", gap: 4 }}>
+                  {(["all", "selected", "unassigned"] as const).map((mode) => {
+                    const labels = {
+                      all: `Todos (${productos.length})`,
+                      selected: `Seleccionados (${selectedProductIds.length})`,
+                      unassigned: `Sin asignar (${productos.length - selectedProductIds.length})`,
+                    };
+                    const active = productFilter === mode;
+                    return (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => setProductFilter(mode)}
+                        style={{
+                          padding: "3px 9px",
+                          borderRadius: 99,
+                          fontSize: 11,
+                          fontWeight: active ? 700 : 500,
+                          cursor: "pointer",
+                          border: active
+                            ? "1.5px solid hsl(var(--terracota))"
+                            : "1.5px solid hsl(var(--border))",
+                          backgroundColor: active
+                            ? "hsl(var(--terracota) / 0.1)"
+                            : "transparent",
+                          color: active
+                            ? "hsl(var(--terracota))"
+                            : "hsl(var(--text-muted))",
+                          fontFamily: "inherit",
+                          transition: "all 0.12s ease",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {labels[mode]}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Lista de pills filtrada */}
               <div
                 style={{
                   display: "flex",
                   flexWrap: "wrap",
                   gap: 6,
-                  maxHeight: 130,
+                  maxHeight: 140,
                   overflowY: "auto",
                   padding: "8px 0",
+                  minHeight: 40,
                 }}
               >
                 {productos.length === 0 ? (
                   <span style={{ fontSize: 12, color: "hsl(var(--text-muted))" }}>
                     No hay productos disponibles
                   </span>
-                ) : (
-                  productos.map((p) => {
+                ) : (() => {
+                  const visible = productos.filter((p) => {
+                    if (productFilter === "selected") return selectedProductIds.includes(p.id);
+                    if (productFilter === "unassigned") return !selectedProductIds.includes(p.id);
+                    return true;
+                  });
+                  if (visible.length === 0) {
+                    return (
+                      <span style={{ fontSize: 12, color: "hsl(var(--text-muted))", padding: "4px 0" }}>
+                        {productFilter === "selected" ? "Ningún producto seleccionado aún" : "Todos los productos ya están asignados"}
+                      </span>
+                    );
+                  }
+                  return visible.map((p) => {
                     const selected = selectedProductIds.includes(p.id);
                     return (
                       <button
@@ -274,14 +330,9 @@ export function ProveedorModal({
                         {p.nombre}
                       </button>
                     );
-                  })
-                )}
+                  });
+                })()}
               </div>
-              {selectedProductIds.length > 0 && (
-                <p style={{ fontSize: 11, color: "hsl(var(--text-muted))", marginTop: 6 }}>
-                  {selectedProductIds.length} producto(s) seleccionado(s)
-                </p>
-              )}
             </div>
           </div>
 

@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useEffect, useTransition } from "react";
+import { useState, useEffect, useTransition, useMemo } from "react";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { X, Check, Loader2, Plus } from "lucide-react";
 import { ordenSchema, type OrdenInput } from "@/lib/schemas/compra.schema";
@@ -42,8 +41,10 @@ export function CompraModal({
 }: CompraModalProps) {
   const [isPending, startTransition] = useTransition();
   const [lines, setLines] = useState<LineItem[]>([{ product_id: "", qty: 1, price: 0 }]);
+  // supplierHint: sugerencia de proveedor cuando el producto elegido pertenece a proveedores
+  const [supplierHint, setSupplierHint] = useState<{ lineIdx: number; options: Proveedor[] } | null>(null);
 
-  const { register, handleSubmit, watch, reset, formState: { errors } } = useForm<HeaderForm>({
+  const { register, handleSubmit, watch, reset, setValue, formState: { errors } } = useForm<HeaderForm>({
     defaultValues: {
       supplier_id: proveedores[0]?.id ?? "",
       fecha: new Date().toISOString().split("T")[0],
@@ -54,17 +55,30 @@ export function CompraModal({
 
   const selectedSupplierId = watch("supplier_id");
 
-  const suppProds = (() => {
-    const supp = proveedores.find((p) => p.id === selectedSupplierId);
-    if (supp && supp.producto_ids && supp.producto_ids.length > 0) {
-      const filtered = productos.filter((p) => supp.producto_ids.includes(p.id));
-      return filtered.length > 0 ? filtered : productos;
+  // Mapa inverso: product_id → proveedores que lo venden
+  const productSupplierMap = useMemo(() => {
+    const map = new Map<string, Proveedor[]>();
+    for (const prov of proveedores) {
+      for (const pid of prov.producto_ids ?? []) {
+        if (!map.has(pid)) map.set(pid, []);
+        map.get(pid)!.push(prov);
+      }
     }
-    return productos;
-  })();
+    return map;
+  }, [proveedores]);
+
+  // Productos del proveedor seleccionado (para optgroup)
+  const supplierProductIds = useMemo(() => {
+    const supp = proveedores.find((p) => p.id === selectedSupplierId);
+    return new Set(supp?.producto_ids ?? []);
+  }, [proveedores, selectedSupplierId]);
+
+  const supplierProds = productos.filter((p) => supplierProductIds.has(p.id));
+  const otherProds = productos.filter((p) => !supplierProductIds.has(p.id));
 
   useEffect(() => {
     if (!open) return;
+    setSupplierHint(null);
     if (editTarget) {
       const detalles = (editTarget.detalles ?? []) as any[];
       reset({
@@ -97,18 +111,43 @@ export function CompraModal({
   function removeLine(i: number) {
     if (lines.length === 1) return;
     setLines((prev) => prev.filter((_, idx) => idx !== i));
+    if (supplierHint?.lineIdx === i) setSupplierHint(null);
   }
 
   function updateLine(i: number, field: keyof LineItem, value: string | number) {
-    setLines((prev) => {
-      const next = [...prev];
-      next[i] = { ...next[i], [field]: value };
-      if (field === "product_id") {
+    const next = lines.map((l, idx) => {
+      if (idx !== i) return l;
+      const updated = { ...l, [field]: value };
+      if (field === "product_id" && value) {
         const prod = productos.find((p) => p.id === value);
-        if (prod) next[i].price = prod.last_price;
+        if (prod) updated.price = prod.last_price;
       }
-      return next;
+      return updated;
     });
+    setLines(next);
+
+    if (field !== "product_id") return;
+
+    if (!value) {
+      setSupplierHint(null);
+      return;
+    }
+
+    const suppliersForProd = productSupplierMap.get(value as string) ?? [];
+    if (suppliersForProd.length === 0) {
+      setSupplierHint(null);
+      return;
+    }
+
+    const alreadyCorrect = suppliersForProd.some((s) => s.id === selectedSupplierId);
+    if (alreadyCorrect) {
+      setSupplierHint(null);
+    } else if (suppliersForProd.length === 1 && !selectedSupplierId) {
+      setValue("supplier_id", suppliersForProd[0].id);
+      setSupplierHint(null);
+    } else {
+      setSupplierHint({ lineIdx: i, options: suppliersForProd });
+    }
   }
 
   const total = lines.reduce((s, l) => s + (Number(l.qty) || 0) * (Number(l.price) || 0), 0);
@@ -274,58 +313,141 @@ export function CompraModal({
                 ))}
               </div>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {lines.map((line, i) => (
-                  <div key={i} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 32px", gap: 8, alignItems: "center" }}>
-                    <select
-                      value={line.product_id}
-                      onChange={(e) => updateLine(i, "product_id", e.target.value)}
-                      style={inputStyle(false)}
-                    >
-                      <option value="">Seleccionar...</option>
-                      {suppProds.map((p) => (
-                        <option key={p.id} value={p.id}>{p.nombre} ({p.unidad})</option>
-                      ))}
-                    </select>
-                    <input
-                      type="number"
-                      min={0}
-                      step="0.001"
-                      value={line.qty || ""}
-                      onChange={(e) => updateLine(i, "qty", e.target.value)}
-                      placeholder="0"
-                      style={{ ...inputStyle(false), fontVariantNumeric: "tabular-nums" }}
-                    />
-                    <input
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      value={line.price || ""}
-                      onChange={(e) => updateLine(i, "price", e.target.value)}
-                      placeholder="0.00"
-                      style={{ ...inputStyle(false), fontVariantNumeric: "tabular-nums" }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeLine(i)}
-                      disabled={lines.length === 1}
-                      style={{
+                  <div key={i}>
+                    <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 32px", gap: 8, alignItems: "center" }}>
+                      {/* Selector de producto con optgroups */}
+                      <select
+                        value={line.product_id}
+                        onChange={(e) => updateLine(i, "product_id", e.target.value)}
+                        style={inputStyle(false)}
+                      >
+                        <option value="">Seleccionar producto...</option>
+                        {supplierProds.length > 0 ? (
+                          <>
+                            <optgroup label={`— Productos de este proveedor (${supplierProds.length}) —`}>
+                              {supplierProds.map((p) => (
+                                <option key={p.id} value={p.id}>{p.nombre} ({p.unidad})</option>
+                              ))}
+                            </optgroup>
+                            {otherProds.length > 0 && (
+                              <optgroup label={`— Otros productos (${otherProds.length}) —`}>
+                                {otherProds.map((p) => (
+                                  <option key={p.id} value={p.id}>{p.nombre} ({p.unidad})</option>
+                                ))}
+                              </optgroup>
+                            )}
+                          </>
+                        ) : (
+                          productos.map((p) => (
+                            <option key={p.id} value={p.id}>{p.nombre} ({p.unidad})</option>
+                          ))
+                        )}
+                      </select>
+
+                      <input
+                        type="number"
+                        min={0}
+                        step="0.001"
+                        value={line.qty || ""}
+                        onChange={(e) => updateLine(i, "qty", e.target.value)}
+                        placeholder="0"
+                        style={{ ...inputStyle(false), fontVariantNumeric: "tabular-nums" }}
+                      />
+                      <input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={line.price || ""}
+                        onChange={(e) => updateLine(i, "price", e.target.value)}
+                        placeholder="0.00"
+                        style={{ ...inputStyle(false), fontVariantNumeric: "tabular-nums" }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeLine(i)}
+                        disabled={lines.length === 1}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          width: 32,
+                          height: 36,
+                          borderRadius: 6,
+                          border: "none",
+                          backgroundColor: lines.length === 1 ? "transparent" : "hsl(var(--terracota) / 0.1)",
+                          color: "hsl(var(--terracota))",
+                          cursor: lines.length === 1 ? "not-allowed" : "pointer",
+                          opacity: lines.length === 1 ? 0.3 : 1,
+                          flexShrink: 0,
+                        }}
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+
+                    {/* Hint de proveedor: aparece debajo de la línea cuando el producto elegido
+                        pertenece a un proveedor distinto al seleccionado en el header */}
+                    {supplierHint?.lineIdx === i && (
+                      <div style={{
+                        gridColumn: "1 / -1",
                         display: "flex",
                         alignItems: "center",
-                        justifyContent: "center",
-                        width: 32,
-                        height: 36,
-                        borderRadius: 6,
-                        border: "none",
-                        backgroundColor: lines.length === 1 ? "transparent" : "hsl(var(--terracota) / 0.1)",
-                        color: "hsl(var(--terracota))",
-                        cursor: lines.length === 1 ? "not-allowed" : "pointer",
-                        opacity: lines.length === 1 ? 0.3 : 1,
-                        flexShrink: 0,
-                      }}
-                    >
-                      <X size={14} />
-                    </button>
+                        gap: 6,
+                        marginTop: 4,
+                        padding: "6px 10px",
+                        borderRadius: 8,
+                        backgroundColor: "hsl(var(--gold) / 0.1)",
+                        border: "1px solid hsl(var(--gold) / 0.3)",
+                      }}>
+                        <span style={{ fontSize: 11, color: "hsl(var(--gold))", fontWeight: 600 }}>
+                          ¿Proveedor?
+                        </span>
+                        <span style={{ fontSize: 11, color: "hsl(var(--text-sub))" }}>
+                          Este producto lo surten:
+                        </span>
+                        {supplierHint.options.map((s) => (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={() => {
+                              setValue("supplier_id", s.id);
+                              setSupplierHint(null);
+                            }}
+                            style={{
+                              padding: "3px 10px",
+                              borderRadius: 99,
+                              fontSize: 11,
+                              fontWeight: 600,
+                              cursor: "pointer",
+                              border: "1.5px solid hsl(var(--gold))",
+                              backgroundColor: "hsl(var(--gold) / 0.15)",
+                              color: "hsl(var(--gold))",
+                              fontFamily: "inherit",
+                              transition: "all 0.12s ease",
+                            }}
+                          >
+                            {s.company}
+                          </button>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => setSupplierHint(null)}
+                          style={{
+                            marginLeft: "auto",
+                            padding: 2,
+                            border: "none",
+                            background: "transparent",
+                            cursor: "pointer",
+                            color: "hsl(var(--text-muted))",
+                            display: "flex",
+                          }}
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

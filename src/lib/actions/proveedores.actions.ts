@@ -1,12 +1,10 @@
 "use server";
 
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createServerClient } from "@/lib/supabase/server";
 import { requireAuth } from "@/lib/actions/auth.actions";
 import { proveedorSchema, type ProveedorInput } from "@/lib/schemas/proveedor.schema";
 import { revalidatePath } from "next/cache";
 import type { Proveedor, OrdenCompra } from "@/types";
-
-const sb = () => createAdminClient();
 
 function escapeLike(input: string): string {
   return input.replace(/[\\%_]/g, (m) => `\\${m}`);
@@ -15,7 +13,11 @@ function escapeLike(input: string): string {
 export async function getProveedores(
   search?: string,
 ): Promise<{ data: Proveedor[] | null; error: string | null }> {
-  let query = sb()
+  const auth = await requireAuth();
+  if (auth.error) return { data: null, error: auth.error };
+  const supabase = await createServerClient();
+
+  let query = supabase
     .from("proveedores")
     .select(
       "*, proveedor_productos(product_id), ordenes_compra(id)",
@@ -55,7 +57,10 @@ export async function getProveedores(
 export async function getProveedorOrdenes(
   supplierId: string,
 ): Promise<{ data: OrdenCompra[] | null; error: string | null }> {
-  const { data, error } = await sb()
+  const auth = await requireAuth();
+  if (auth.error) return { data: null, error: auth.error };
+  const supabase = await createServerClient();
+  const { data, error } = await supabase
     .from("ordenes_compra")
     .select("id, folio, supplier_id, fecha, total, has_invoice, invoice_url, created_at")
     .eq("supplier_id", supplierId)
@@ -68,9 +73,9 @@ export async function getProveedorOrdenes(
 export async function createProveedor(
   input: ProveedorInput,
 ): Promise<{ data: Proveedor | null; error: string | null }> {
-  const authErr = await requireAuth();
-  if (authErr) return { data: null, error: authErr.error };
-  const supabase = sb();
+  const auth = await requireAuth();
+  if (auth.error) return { data: null, error: auth.error };
+  const supabase = await createServerClient();
 
   const parsed = proveedorSchema.safeParse(input);
   if (!parsed.success)
@@ -100,6 +105,7 @@ export async function createProveedor(
   }
 
   revalidatePath("/proveedores");
+  revalidatePath("/compras");
 
   const newProveedor: Proveedor = {
     ...data,
@@ -114,9 +120,9 @@ export async function updateProveedor(
   id: string,
   input: ProveedorInput,
 ): Promise<{ data: Proveedor | null; error: string | null }> {
-  const authErr = await requireAuth();
-  if (authErr) return { data: null, error: authErr.error };
-  const supabase = sb();
+  const auth = await requireAuth();
+  if (auth.error) return { data: null, error: auth.error };
+  const supabase = await createServerClient();
 
   const parsed = proveedorSchema.safeParse(input);
   if (!parsed.success)
@@ -153,6 +159,7 @@ export async function updateProveedor(
     .eq("supplier_id", id);
 
   revalidatePath("/proveedores");
+  revalidatePath("/compras");
 
   const updated: Proveedor = {
     ...data,
@@ -166,9 +173,9 @@ export async function updateProveedor(
 export async function deleteProveedor(
   id: string,
 ): Promise<{ error: string | null }> {
-  const authErr = await requireAuth();
-  if (authErr) return { error: authErr.error };
-  const supabase = sb();
+  const auth = await requireAuth();
+  if (auth.error) return { error: auth.error };
+  const supabase = await createServerClient();
 
   const { count } = await supabase
     .from("ordenes_compra")
@@ -190,10 +197,21 @@ export async function deleteProveedor(
   return { error: null };
 }
 
+export async function getAllAssignedProductIds(): Promise<{ data: string[]; error: string | null }> {
+  const auth = await requireAuth();
+  if (auth.error) return { data: [], error: auth.error };
+  const supabase = await createServerClient();
+  const { data, error } = await supabase
+    .from("proveedor_productos")
+    .select("product_id");
+  if (error) return { data: [], error: error.message };
+  return { data: (data ?? []).map((r: any) => r.product_id as string), error: null };
+}
+
 export async function toggleActivo(id: string): Promise<{ error: string | null }> {
-  const authErr = await requireAuth();
-  if (authErr) return { error: authErr.error };
-  const supabase = sb();
+  const auth = await requireAuth();
+  if (auth.error) return { error: auth.error };
+  const supabase = await createServerClient();
   const { data: prov } = await supabase
     .from("proveedores")
     .select("activo")

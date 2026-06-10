@@ -1,17 +1,15 @@
 "use server";
 
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createServerClient } from "@/lib/supabase/server";
 import { requireAuth } from "@/lib/actions/auth.actions";
+import { checkRateLimit } from "@/lib/ratelimit";
 import { ordenSchema, updateOrdenSchema, type OrdenInput, type UpdateOrdenInput } from "@/lib/schemas/compra.schema";
 import { revalidatePath } from "next/cache";
 import type { OrdenCompra } from "@/types";
 
-const sb = () => createAdminClient();
-const CARLOS_USER_ID = "00000000-0000-0000-0000-000000000001";
-
-async function nextFolio(): Promise<string> {
+async function nextFolio(supabase: Awaited<ReturnType<typeof createServerClient>>): Promise<string> {
   const year = new Date().getFullYear();
-  const { count } = await sb()
+  const { count } = await supabase
     .from("ordenes_compra")
     .select("*", { count: "exact", head: true })
     .gte("created_at", `${year}-01-01`)
@@ -30,9 +28,12 @@ interface GetOrdenesOpts {
 export async function getOrdenes(
   opts: GetOrdenesOpts = {},
 ): Promise<{ data: OrdenCompra[] | null; error: string | null }> {
+  const auth = await requireAuth();
+  if (auth.error) return { data: null, error: auth.error };
+  const supabase = await createServerClient();
   const { desde, hasta, supplier_id, limit = 200 } = opts;
 
-  let query = sb()
+  let query = supabase
     .from("ordenes_compra")
     .select(
       "*, proveedores:supplier_id(id,company), detalle_orden(id,product_id,qty,price,subtotal,productos:product_id(id,nombre,unidad,categoria_id,categorias:categoria_id(id,nombre,color)))",
@@ -52,7 +53,10 @@ export async function getOrdenes(
 export async function getOrdenById(
   id: string,
 ): Promise<{ data: OrdenCompra | null; error: string | null }> {
-  const { data, error } = await sb()
+  const auth = await requireAuth();
+  if (auth.error) return { data: null, error: auth.error };
+  const supabase = await createServerClient();
+  const { data, error } = await supabase
     .from("ordenes_compra")
     .select(
       "*, proveedores:supplier_id(id,company), detalle_orden(id,product_id,qty,price,subtotal,productos:product_id(id,nombre,unidad,categoria_id,categorias:categoria_id(id,nombre,color)))",
@@ -77,91 +81,55 @@ function remapOrden(row: any): OrdenCompra {
 export async function createOrden(
   input: OrdenInput,
 ): Promise<{ data: OrdenCompra | null; error: string | null }> {
-  const authErr = await requireAuth();
-  if (authErr) return { data: null, error: authErr.error };
+  const auth = await requireAuth();
+  if (auth.error) return { data: null, error: auth.error };
+
+  const rl = await checkRateLimit(`orden:${auth.userId}`);
+  if (!rl.success) return { data: null, error: "Demasiadas operaciones. Intenta en unos minutos." };
+
   const parsed = ordenSchema.safeParse(input);
   if (!parsed.success) return { data: null, error: "Datos inválidos" };
+  const supabase = await createServerClient();
 
   const { supplier_id, fecha, detalles, has_invoice, invoice_url, folio: folioInput } = parsed.data;
-  const total = detalles.reduce((s, d) => s + d.qty * d.price, 0);
-  const folio = folioInput?.trim() || (await nextFolio());
-  // Normalize fecha to YYYY-MM-DD so comparisons are timezone-safe
+  const folio = folioInput?.trim() || (await nextFolio(supabase));
   const fechaNorm = fecha.slice(0, 10);
 
-  // 1. Create order
-  const { data: orden, error: oErr } = await sb()
-    .from("ordenes_compra")
-    .insert({
-      folio,
-      supplier_id,
-      fecha: fechaNorm,
-      total,
-      has_invoice: has_invoice ?? false,
-      invoice_url: invoice_url ?? null,
-    })
-    .select("*")
-    .single();
-  if (oErr) return { data: null, error: oErr.message };
+  // Single atomic RPC: orden + detalles + movimientos + total_spent + last_price
+  const { data: rpcResult, error: rpcErr } = await supabase.rpc("crear_orden_compra", {
+    p_supplier_id: supplier_id,
+    p_fecha: fechaNorm,
+    p_folio: folio,
+    p_detalles: detalles.map((d) => ({ product_id: d.product_id, qty: d.qty, price: d.price })),
+    p_has_invoice: has_invoice ?? false,
+    p_invoice_url: invoice_url ?? null,
+    p_user_id: auth.userId,
+  });
+  if (rpcErr) return { data: null, error: rpcErr.message };
 
-  // 2. Insert detalles
-  const { error: dErr } = await sb()
-    .from("detalle_orden")
-    .insert(detalles.map((d) => ({ orden_id: orden.id, product_id: d.product_id, qty: d.qty, price: d.price })));
-  if (dErr) {
-    await sb().from("ordenes_compra").delete().eq("id", orden.id);
-    return { data: null, error: dErr.message };
-  }
-
-  // 3. Register movimientos entrada (trigger updates stock_actual)
-  const { error: mErr } = await sb()
-    .from("movimientos")
-    .insert(
-      detalles.map((d) => ({
-        product_id: d.product_id,
-        tipo: "entrada",
-        qty: d.qty,
-        fecha: fechaNorm,
-        user_id: CARLOS_USER_ID,
-        notes: `Compra ${folio}`,
-        ref_id: orden.id,
-      })),
-    );
-  if (mErr) {
-    await sb().from("detalle_orden").delete().eq("orden_id", orden.id);
-    await sb().from("ordenes_compra").delete().eq("id", orden.id);
-    return { data: null, error: mErr.message };
-  }
-
-  // 4. Update total_spent on proveedor
-  const { data: prov } = await sb().from("proveedores").select("total_spent").eq("id", supplier_id).single();
-  if (prov) {
-    await sb().from("proveedores").update({ total_spent: Number(prov.total_spent) + total }).eq("id", supplier_id);
-  }
-
-  // 5. Update last_price on productos
-  for (const d of detalles) {
-    await sb().from("productos").update({ last_price: d.price }).eq("id", d.product_id);
-  }
+  // If invoice_url was passed separately after upload, patch it now
+  const ordenId = (rpcResult as any).orden_id as string;
 
   revalidatePath("/compras");
   revalidatePath("/dashboard");
   revalidatePath("/productos");
-  return getOrdenById(orden.id);
+  return getOrdenById(ordenId);
 }
 
 export async function updateOrden(
   id: string,
   input: UpdateOrdenInput,
 ): Promise<{ data: OrdenCompra | null; error: string | null }> {
-  const authErr = await requireAuth();
-  if (authErr) return { data: null, error: authErr.error };
+  const auth = await requireAuth();
+  if (auth.error) return { data: null, error: auth.error };
   const parsed = updateOrdenSchema.safeParse(input);
   if (!parsed.success) return { data: null, error: "Datos inválidos" };
+  const supabase = await createServerClient();
 
   const { supplier_id, fecha, detalles, has_invoice, invoice_url, folio } = parsed.data;
 
   // Fetch current order for rollback calculations
-  const { data: currentOrden } = await sb()
+  const { data: currentOrden } = await supabase
     .from("ordenes_compra")
     .select("supplier_id,total,folio")
     .eq("id", id)
@@ -169,21 +137,21 @@ export async function updateOrden(
   if (!currentOrden) return { data: null, error: "Orden no encontrada" };
 
   // 1. Delete old movimientos entrada (trigger reverses stock)
-  await sb().from("movimientos").delete().eq("ref_id", id).eq("tipo", "entrada");
+  await supabase.from("movimientos").delete().eq("ref_id", id).eq("tipo", "entrada");
 
   // 2. Delete old detalles
-  await sb().from("detalle_orden").delete().eq("orden_id", id);
+  await supabase.from("detalle_orden").delete().eq("orden_id", id);
 
   // 3. Insert new detalles
   if (detalles && detalles.length > 0) {
-    const { error: dErr } = await sb()
+    const { error: dErr } = await supabase
       .from("detalle_orden")
       .insert(detalles.map((d) => ({ orden_id: id, product_id: d.product_id, qty: d.qty, price: d.price })));
     if (dErr) return { data: null, error: dErr.message };
 
     // 4. Insert new movimientos entrada
     const newFolio = folio?.trim() || currentOrden.folio;
-    const { error: mErr } = await sb()
+    const { error: mErr } = await supabase
       .from("movimientos")
       .insert(
         detalles.map((d) => ({
@@ -191,7 +159,7 @@ export async function updateOrden(
           tipo: "entrada",
           qty: d.qty,
           fecha: fecha ?? new Date().toISOString().split("T")[0],
-          user_id: CARLOS_USER_ID,
+          user_id: auth.userId,
           notes: `Compra ${newFolio}`,
           ref_id: id,
         })),
@@ -200,17 +168,17 @@ export async function updateOrden(
 
     // 5. Update last_price
     for (const d of detalles) {
-      await sb().from("productos").update({ last_price: d.price }).eq("id", d.product_id);
+      await supabase.from("productos").update({ last_price: d.price }).eq("id", d.product_id);
     }
   }
 
   // 6. Update total_spent on proveedor (reverse old, add new)
   const newTotal = detalles ? detalles.reduce((s, d) => s + d.qty * d.price, 0) : Number(currentOrden.total);
   const effectiveSupplierId = supplier_id ?? currentOrden.supplier_id;
-  const { data: prov } = await sb().from("proveedores").select("total_spent").eq("id", effectiveSupplierId).single();
+  const { data: prov } = await supabase.from("proveedores").select("total_spent").eq("id", effectiveSupplierId).single();
   if (prov) {
     const adjusted = Math.max(0, Number(prov.total_spent) - Number(currentOrden.total)) + newTotal;
-    await sb().from("proveedores").update({ total_spent: adjusted }).eq("id", effectiveSupplierId);
+    await supabase.from("proveedores").update({ total_spent: adjusted }).eq("id", effectiveSupplierId);
   }
 
   // 7. Update orden fields
@@ -221,7 +189,7 @@ export async function updateOrden(
   if (has_invoice !== undefined) updateFields.has_invoice = has_invoice;
   if (invoice_url !== undefined) updateFields.invoice_url = invoice_url;
 
-  const { data: updated, error: uErr } = await sb()
+  const { error: uErr } = await supabase
     .from("ordenes_compra")
     .update(updateFields)
     .eq("id", id)
@@ -236,28 +204,23 @@ export async function updateOrden(
 }
 
 export async function deleteOrden(id: string): Promise<{ error: string | null }> {
-  const authErr = await requireAuth();
-  if (authErr) return { error: authErr.error };
-  const { data: orden } = await sb()
+  const auth = await requireAuth();
+  if (auth.error) return { error: auth.error };
+  const supabase = await createServerClient();
+  const { data: orden } = await supabase
     .from("ordenes_compra")
     .select("supplier_id,total,invoice_url")
     .eq("id", id)
     .single();
 
-  // Get detalles for stock reversal
-  const { data: detalles } = await sb()
-    .from("detalle_orden")
-    .select("product_id,qty,price")
-    .eq("orden_id", id);
-
   // Delete movimientos entrada (trigger reverses stock)
-  await sb().from("movimientos").delete().eq("ref_id", id).eq("tipo", "entrada");
+  await supabase.from("movimientos").delete().eq("ref_id", id).eq("tipo", "entrada");
 
   // Reverse total_spent on proveedor
   if (orden) {
-    const { data: prov } = await sb().from("proveedores").select("total_spent").eq("id", orden.supplier_id).single();
+    const { data: prov } = await supabase.from("proveedores").select("total_spent").eq("id", orden.supplier_id).single();
     if (prov) {
-      await sb()
+      await supabase
         .from("proveedores")
         .update({ total_spent: Math.max(0, Number(prov.total_spent) - Number(orden.total)) })
         .eq("id", orden.supplier_id);
@@ -265,11 +228,11 @@ export async function deleteOrden(id: string): Promise<{ error: string | null }>
 
     // Delete invoice from Storage if present
     if (orden.invoice_url) {
-      await sb().storage.from("facturas").remove([orden.invoice_url]);
+      await supabase.storage.from("facturas").remove([orden.invoice_url]);
     }
   }
 
-  const { error } = await sb().from("ordenes_compra").delete().eq("id", id);
+  const { error } = await supabase.from("ordenes_compra").delete().eq("id", id);
   if (error) return { error: error.message };
 
   revalidatePath("/compras");
@@ -278,19 +241,39 @@ export async function deleteOrden(id: string): Promise<{ error: string | null }>
   return { error: null };
 }
 
+const ALLOWED_MIME = new Set(["application/pdf", "image/jpeg", "image/png", "image/webp"]);
+const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
+
+async function detectMagicBytes(file: File): Promise<boolean> {
+  const buf = new Uint8Array(await file.slice(0, 4).arrayBuffer());
+  const isPdf = buf[0] === 0x25 && buf[1] === 0x50; // %P
+  const isJpg = buf[0] === 0xFF && buf[1] === 0xD8;
+  const isPng = buf[0] === 0x89 && buf[1] === 0x50;
+  const isWebp = buf[0] === 0x52 && buf[1] === 0x49; // RI (RIFF)
+  return isPdf || isJpg || isPng || isWebp;
+}
+
 export async function uploadFactura(
   formData: FormData,
 ): Promise<{ path: string | null; error: string | null }> {
-  const authErr = await requireAuth();
-  if (authErr) return { path: null, error: authErr.error };
+  const auth = await requireAuth();
+  if (auth.error) return { path: null, error: auth.error };
   const file = formData.get("file") as File | null;
   if (!file) return { path: null, error: "No se recibió archivo" };
 
+  if (!ALLOWED_MIME.has(file.type))
+    return { path: null, error: "Tipo no permitido. Solo PDF, JPG, PNG o WEBP." };
+  if (file.size > MAX_BYTES)
+    return { path: null, error: "El archivo excede 10 MB." };
+  if (!(await detectMagicBytes(file)))
+    return { path: null, error: "El archivo no corresponde a su extensión declarada." };
+
+  const supabase = await createServerClient();
   const timestamp = Date.now();
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
   const path = `${timestamp}_${safeName}`;
 
-  const { error } = await sb()
+  const { error } = await supabase
     .storage
     .from("facturas")
     .upload(path, file, { contentType: file.type, upsert: false });
@@ -300,9 +283,10 @@ export async function uploadFactura(
 }
 
 export async function deleteFactura(path: string): Promise<{ error: string | null }> {
-  const authErr = await requireAuth();
-  if (authErr) return { error: authErr.error };
-  const { error } = await sb().storage.from("facturas").remove([path]);
+  const auth = await requireAuth();
+  if (auth.error) return { error: auth.error };
+  const supabase = await createServerClient();
+  const { error } = await supabase.storage.from("facturas").remove([path]);
   if (error) return { error: error.message };
   return { error: null };
 }
@@ -310,7 +294,10 @@ export async function deleteFactura(path: string): Promise<{ error: string | nul
 export async function getFacturaSignedUrl(
   path: string,
 ): Promise<{ url: string | null; error: string | null }> {
-  const { data, error } = await sb()
+  const auth = await requireAuth();
+  if (auth.error) return { url: null, error: auth.error };
+  const supabase = await createServerClient();
+  const { data, error } = await supabase
     .storage
     .from("facturas")
     .createSignedUrl(path, 3600);
