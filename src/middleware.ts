@@ -8,7 +8,7 @@ export async function middleware(request: NextRequest) {
 
   // Pass a mutable response into the client so refreshed session cookies
   // are written back to the browser on every request.
-  let response = NextResponse.next({ request });
+  const response = NextResponse.next({ request });
 
   const supabase = createMiddlewareClient(request, response);
   const { data: { user } } = await supabase.auth.getUser();
