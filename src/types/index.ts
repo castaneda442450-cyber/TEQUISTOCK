@@ -18,6 +18,7 @@ export interface Producto {
   stock_minimo: number;
   last_price: number;
   imagen_url: string | null;
+  frecuencia_conteo: 'diario' | 'semanal' | 'mensual';
   created_at: string;
   categoria?: Categoria;
 }
@@ -164,4 +165,33 @@ export interface DashboardData {
   spendingTrend: SpendingTrendPoint[];
   gastoPorCategoria: Record<string, { value: number; color: string }>;
   filterMeta: FilterMeta;
+}
+
+// ─── Conteos físicos ──────────────────────────────────────────────────────────
+
+export interface ConteoFisico {
+  id: string;
+  product_id: string;
+  user_id: string;
+  fecha: string;
+  qty_fisica: number;
+  qty_teorica: number;
+  diferencia: number;
+  notas: string | null;
+  tipo_conteo: 'diario' | 'preparacion' | 'emergencia';
+  created_at: string;
+  producto?: Producto;
+}
+
+// ─── Fichas técnicas ──────────────────────────────────────────────────────────
+
+export interface FichaTecnica {
+  id: string;
+  platillo_nombre: string;
+  producto_id: string;
+  qty_por_porcion: number;
+  unidad: string;
+  activo: boolean;
+  created_at: string;
+  producto?: Producto;
 }

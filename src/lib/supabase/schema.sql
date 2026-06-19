@@ -335,3 +335,129 @@ INSERT INTO public.movimientos (product_id, tipo, qty, user_id, notes, motivo_me
 ((SELECT id FROM public.productos WHERE nombre='Pechuga de Pollo'), 'merma', 1, gen_random_uuid(), NULL, 'Vencimiento', 80.00),
 ((SELECT id FROM public.productos WHERE nombre='Chile Poblano'), 'merma', 2, gen_random_uuid(), NULL, 'Mala calidad', 50.00)
 ON CONFLICT DO NOTHING;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- MIGRACIONES — Cierre de turno, conteos físicos y fichas técnicas
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- Convertir movimientos.qty a numeric para soportar decimales
+ALTER TABLE public.movimientos ALTER COLUMN qty TYPE numeric(10,3);
+
+-- CAMPO: productos.frecuencia_conteo
+ALTER TABLE public.productos
+  ADD COLUMN IF NOT EXISTS frecuencia_conteo text NOT NULL DEFAULT 'semanal'
+    CHECK (frecuencia_conteo IN ('diario', 'semanal', 'mensual'));
+
+-- TABLA: conteos_fisicos
+CREATE TABLE IF NOT EXISTS public.conteos_fisicos (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  product_id    uuid NOT NULL REFERENCES public.productos(id) ON DELETE RESTRICT,
+  user_id       uuid NOT NULL,
+  fecha         date NOT NULL DEFAULT CURRENT_DATE,
+  qty_fisica    numeric(10,3) NOT NULL,
+  qty_teorica   numeric(10,3) NOT NULL,
+  diferencia    numeric(10,3) GENERATED ALWAYS AS (qty_fisica - qty_teorica) STORED,
+  notas         text,
+  tipo_conteo   text NOT NULL CHECK (tipo_conteo IN ('diario', 'preparacion', 'emergencia')),
+  created_at    timestamp DEFAULT now()
+);
+
+ALTER TABLE public.conteos_fisicos ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "conteos_select" ON public.conteos_fisicos
+  FOR SELECT TO authenticated USING (true);
+CREATE POLICY "conteos_insert" ON public.conteos_fisicos
+  FOR INSERT TO authenticated WITH CHECK (true);
+
+-- TABLA: fichas_tecnicas
+CREATE TABLE IF NOT EXISTS public.fichas_tecnicas (
+  id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  platillo_nombre  text NOT NULL,
+  producto_id      uuid NOT NULL REFERENCES public.productos(id) ON DELETE RESTRICT,
+  qty_por_porcion  numeric(10,3) NOT NULL,
+  unidad           text NOT NULL,
+  activo           boolean NOT NULL DEFAULT true,
+  created_at       timestamp DEFAULT now()
+);
+
+ALTER TABLE public.fichas_tecnicas ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "fichas_select" ON public.fichas_tecnicas
+  FOR SELECT TO authenticated USING (true);
+CREATE POLICY "fichas_insert" ON public.fichas_tecnicas
+  FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "fichas_update" ON public.fichas_tecnicas
+  FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "fichas_delete" ON public.fichas_tecnicas
+  FOR DELETE TO authenticated USING (true);
+
+-- FUNCIÓN RPC: procesar_cierre_turno
+CREATE OR REPLACE FUNCTION public.procesar_cierre_turno(
+  p_items    jsonb,
+  p_user_id  uuid,
+  p_tipo     text
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_item          jsonb;
+  v_product_id    uuid;
+  v_qty_consumida numeric(10,3);
+  v_qty_fisica    numeric(10,3);
+  v_stock_actual  numeric(10,3);
+  v_last_price    numeric(10,3);
+  v_qty_teorica   numeric(10,3);
+  v_diferencia    numeric(10,3);
+BEGIN
+  FOR v_item IN SELECT * FROM jsonb_array_elements(p_items)
+  LOOP
+    v_product_id    := (v_item->>'product_id')::uuid;
+    v_qty_consumida := (v_item->>'qty_consumida')::numeric;
+    v_qty_fisica    := (v_item->>'qty_fisica')::numeric;
+
+    SELECT stock_actual, last_price
+      INTO v_stock_actual, v_last_price
+      FROM public.productos
+     WHERE id = v_product_id
+       FOR UPDATE;
+
+    IF v_qty_fisica > (v_stock_actual - v_qty_consumida) THEN
+      RAISE EXCEPTION
+        'qty_fisica (%) supera el stock disponible (%) para producto %',
+        v_qty_fisica, (v_stock_actual - v_qty_consumida), v_product_id;
+    END IF;
+
+    IF v_qty_consumida > 0 THEN
+      INSERT INTO public.movimientos
+        (product_id, tipo, qty, user_id, notes, fecha)
+      VALUES
+        (v_product_id, 'salida', v_qty_consumida, p_user_id,
+         'Cierre de turno', CURRENT_DATE);
+    END IF;
+
+    SELECT stock_actual INTO v_qty_teorica
+      FROM public.productos WHERE id = v_product_id;
+
+    INSERT INTO public.conteos_fisicos
+      (product_id, user_id, fecha, qty_fisica, qty_teorica, tipo_conteo)
+    VALUES
+      (v_product_id, p_user_id, CURRENT_DATE,
+       v_qty_fisica, v_qty_teorica, p_tipo);
+
+    v_diferencia := v_qty_fisica - v_qty_teorica;
+    IF v_diferencia < -0.5 AND ABS(v_diferencia) > (0.15 * v_qty_teorica) THEN
+      INSERT INTO public.movimientos
+        (product_id, tipo, qty, user_id, notes, motivo_merma, value_lost, fecha)
+      VALUES (
+        v_product_id, 'merma', ABS(v_diferencia), p_user_id,
+        'Diferencia detectada en cierre de turno',
+        'Otro',
+        ABS(v_diferencia) * v_last_price,
+        CURRENT_DATE
+      );
+    END IF;
+  END LOOP;
+END;
+$$;
