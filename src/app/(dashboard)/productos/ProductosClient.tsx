@@ -4,7 +4,7 @@ import { useState, useTransition, useEffect, useRef } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { toast } from "sonner";
 import { Plus, Search, X } from "lucide-react";
-import { deleteProducto } from "@/lib/actions/productos.actions";
+import { deleteProducto, quickUpdateFrecuencia } from "@/lib/actions/productos.actions";
 import type { Producto, Categoria } from "@/types";
 import { ProductosTable } from "@/components/productos/ProductosTable";
 import { Pagination } from "@/components/productos/Pagination";
@@ -21,6 +21,7 @@ interface Props {
   categorias: Categoria[];
   initialSearch: string;
   initialCategoria: string;
+  initialFrecuencia: string;
 }
 
 export default function ProductosClient({
@@ -31,6 +32,7 @@ export default function ProductosClient({
   categorias: initialCategorias,
   initialSearch,
   initialCategoria,
+  initialFrecuencia,
 }: Props) {
   const router = useRouter();
   const pathname = usePathname();
@@ -122,6 +124,14 @@ export default function ProductosClient({
     });
   }
 
+  async function handleFrecuenciaChange(id: string, nombre: string, freq: "diario" | "semanal" | "mensual") {
+    const label = { diario: "Diario", semanal: "Semanal", mensual: "Mensual" }[freq];
+    const res = await quickUpdateFrecuencia(id, freq);
+    if (res.error) { toast.error(res.error); return; }
+    toast.success(`${nombre} → ${label}`);
+    startNavTransition(() => { router.refresh(); });
+  }
+
   return (
     <div style={{ padding: 28 }}>
       {/* Header: filters row */}
@@ -163,6 +173,25 @@ export default function ProductosClient({
               <X size={13} />
             </button>
           )}
+        </div>
+
+        {/* Filtros de frecuencia */}
+        <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+          {(["", "diario", "semanal", "mensual"] as const).map((v) => (
+            <button
+              key={v || "todos"}
+              onClick={() => updateUrlParams({ frecuencia: v || null, page: null })}
+              style={{
+                padding: "7px 14px", fontSize: 12, fontWeight: 600, borderRadius: 8, cursor: "pointer",
+                border: initialFrecuencia === v ? "none" : "1px solid hsl(var(--border))",
+                backgroundColor: initialFrecuencia === v ? "#0B4455" : "hsl(var(--surface))",
+                color: initialFrecuencia === v ? "white" : "hsl(var(--text-sub))",
+                fontFamily: "inherit",
+              }}
+            >
+              {{ "": "Todos", diario: "Diario", semanal: "Semanal", mensual: "Mensual" }[v]}
+            </button>
+          ))}
         </div>
 
         {/* Categoría select */}
@@ -253,7 +282,7 @@ export default function ProductosClient({
         {/* Table or empty */}
         {productos.length === 0 ? (
           <EmptyState
-            hasFilters={Boolean(initialSearch || initialCategoria)}
+            hasFilters={Boolean(initialSearch || initialCategoria || initialFrecuencia)}
             onCreate={openCreate}
           />
         ) : (
@@ -262,6 +291,7 @@ export default function ProductosClient({
             categorias={categorias}
             onEdit={openEdit}
             onDelete={handleDelete}
+            onFrecuenciaChange={handleFrecuenciaChange}
           />
         )}
 

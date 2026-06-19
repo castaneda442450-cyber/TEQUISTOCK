@@ -5,6 +5,7 @@ interface ProductosPageProps {
   searchParams: Promise<{
     search?: string;
     categoria?: string;
+    frecuencia?: string;
     page?: string;
   }>;
 }
@@ -17,6 +18,7 @@ export default async function ProductosPage({ searchParams }: ProductosPageProps
     getProductos({
       search: params.search,
       categoriaId: params.categoria,
+      frecuencia: params.frecuencia,
       page,
     }),
     getCategorias(),
@@ -31,6 +33,7 @@ export default async function ProductosPage({ searchParams }: ProductosPageProps
       categorias={categorias ?? []}
       initialSearch={params.search ?? ""}
       initialCategoria={params.categoria ?? ""}
+      initialFrecuencia={params.frecuencia ?? ""}
     />
   );
 }

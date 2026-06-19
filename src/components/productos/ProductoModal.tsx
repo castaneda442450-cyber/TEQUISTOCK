@@ -4,7 +4,7 @@ import { useTransition, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { X, Check, Loader2 } from "lucide-react";
+import { X, Check, Loader2, Sun, CalendarDays, CalendarCheck } from "lucide-react";
 import { productoSchema, type ProductoInput } from "@/lib/schemas/producto.schema";
 import {
   createProducto,
@@ -12,6 +12,33 @@ import {
 } from "@/lib/actions/productos.actions";
 import { UNIDADES } from "@/lib/constants";
 import type { Producto, Categoria } from "@/types";
+
+const FREQ_MODAL_CONFIG = {
+  diario:  { color: "#791F1F", bg: "#FCEBEB" },
+  semanal: { color: "#633806", bg: "#FAEEDA" },
+  mensual: { color: "#27500A", bg: "#EAF3DE" },
+} as const;
+
+const OPCIONES_FRECUENCIA = [
+  {
+    key: "diario" as const,
+    Icon: Sun,
+    titulo: "Diario",
+    desc: "Aparece en el cierre de turno cada noche. Usar para carnes, mariscos, lácteos, cervezas y licores.",
+  },
+  {
+    key: "semanal" as const,
+    Icon: CalendarDays,
+    titulo: "Semanal",
+    desc: "Se cuenta los lunes por la mañana. Usar para secos, congelados y bebidas embotelladas.",
+  },
+  {
+    key: "mensual" as const,
+    Icon: CalendarCheck,
+    titulo: "Mensual",
+    desc: "Conteo a fondo el primer lunes del mes. Usar para desechables y limpieza.",
+  },
+];
 
 interface ProductoModalProps {
   open: boolean;
@@ -34,6 +61,8 @@ export function ProductoModal({
     register,
     handleSubmit,
     reset,
+    watch,
+    setValue,
     formState: { errors },
   } = useForm<ProductoInput>({
     resolver: zodResolver(productoSchema),
@@ -43,6 +72,7 @@ export function ProductoModal({
       unidad: "kg",
       stock_minimo: 5,
       last_price: 0,
+      frecuencia_conteo: "semanal",
     },
   });
 
@@ -56,6 +86,7 @@ export function ProductoModal({
         unidad: editTarget.unidad,
         stock_minimo: editTarget.stock_minimo,
         last_price: editTarget.last_price,
+        frecuencia_conteo: editTarget.frecuencia_conteo ?? "semanal",
       });
     } else {
       reset({
@@ -64,6 +95,7 @@ export function ProductoModal({
         unidad: "kg",
         stock_minimo: 5,
         last_price: 0,
+        frecuencia_conteo: "semanal",
       });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -222,6 +254,35 @@ export function ProductoModal({
                   />
                 </div>
                 {errors.last_price && <p style={errorStyle}>{errors.last_price.message}</p>}
+              </div>
+            </div>
+
+            {/* Frecuencia de conteo */}
+            <div>
+              <label style={labelStyle}>Frecuencia de Conteo</label>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginTop: 6 }}>
+                {OPCIONES_FRECUENCIA.map(({ key, Icon, titulo, desc }) => {
+                  const cfg = FREQ_MODAL_CONFIG[key];
+                  const selected = watch("frecuencia_conteo") === key;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setValue("frecuencia_conteo", key, { shouldValidate: true })}
+                      style={{
+                        padding: "10px 8px", borderRadius: 8, textAlign: "left",
+                        display: "flex", flexDirection: "column", gap: 4,
+                        border: selected ? `2px solid ${cfg.color}` : "2px solid hsl(var(--border))",
+                        backgroundColor: selected ? cfg.bg : "transparent",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <Icon size={16} style={{ color: cfg.color }} />
+                      <span style={{ fontSize: 12, fontWeight: 700, color: "hsl(var(--text-main))" }}>{titulo}</span>
+                      <span style={{ fontSize: 10, color: "hsl(var(--text-sub))", lineHeight: 1.3 }}>{desc}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>

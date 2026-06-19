@@ -16,6 +16,7 @@ function escapeLike(input: string): string {
 export interface GetProductosParams {
   search?: string;
   categoriaId?: string;
+  frecuencia?: string;
   page?: number;
 }
 
@@ -48,6 +49,9 @@ export async function getProductos(
   }
   if (params.categoriaId && params.categoriaId.trim()) {
     query = query.eq("categoria_id", params.categoriaId);
+  }
+  if (params.frecuencia && ["diario", "semanal", "mensual"].includes(params.frecuencia)) {
+    query = query.eq("frecuencia_conteo", params.frecuencia);
   }
 
   const { data, error, count } = await query
@@ -207,6 +211,22 @@ export async function createCategoria(
 
   revalidatePath("/productos");
   return { data, error: null };
+}
+
+export async function quickUpdateFrecuencia(
+  id: string,
+  frecuencia: "diario" | "semanal" | "mensual",
+): Promise<{ error: string | null }> {
+  const auth = await requireAuth();
+  if (auth.error) return { error: auth.error };
+  const supabase = await createServerClient();
+  const { error } = await supabase
+    .from("productos")
+    .update({ frecuencia_conteo: frecuencia })
+    .eq("id", id);
+  if (error) return { error: error.message };
+  revalidatePath("/productos");
+  return { error: null };
 }
 
 export async function deleteCategoria(

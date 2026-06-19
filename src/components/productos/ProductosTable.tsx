@@ -7,18 +7,29 @@ import {
   useReactTable,
   type ColumnDef,
 } from "@tanstack/react-table";
-import { Package, Pencil, Trash2 } from "lucide-react";
+import { Package, Pencil, Trash2, Sun, CalendarDays, CalendarCheck } from "lucide-react";
 import { formatCurrency, getStockEstado } from "@/lib/format";
 import type { Producto, Categoria } from "@/types";
+
+const FREQ_CONFIG = {
+  diario:  { label: "Diario",  Icon: Sun,           bg: "#FCEBEB", color: "#791F1F" },
+  semanal: { label: "Semanal", Icon: CalendarDays,  bg: "#FAEEDA", color: "#633806" },
+  mensual: { label: "Mensual", Icon: CalendarCheck, bg: "#EAF3DE", color: "#27500A" },
+} as const;
+
+const CYCLE: Record<string, "diario" | "semanal" | "mensual"> = {
+  diario: "semanal", semanal: "mensual", mensual: "diario",
+};
 
 interface ProductosTableProps {
   productos: Producto[];
   categorias: Categoria[];
   onEdit: (p: Producto) => void;
   onDelete: (p: Producto) => void;
+  onFrecuenciaChange: (id: string, nombre: string, freq: "diario" | "semanal" | "mensual") => void;
 }
 
-export function ProductosTable({ productos, categorias, onEdit, onDelete }: ProductosTableProps) {
+export function ProductosTable({ productos, categorias, onEdit, onDelete, onFrecuenciaChange }: ProductosTableProps) {
   const catMap = useMemo(() => {
     const m = new Map<string, Categoria>();
     categorias.forEach((c) => m.set(c.id, c));
@@ -84,6 +95,33 @@ export function ProductosTable({ productos, categorias, onEdit, onDelete }: Prod
             >
               {nombre}
             </span>
+          );
+        },
+      },
+      {
+        id: "conteo",
+        header: "Conteo",
+        meta: { align: "center" as const },
+        cell: ({ row }) => {
+          const p = row.original;
+          const freq = p.frecuencia_conteo ?? "semanal";
+          const cfg = FREQ_CONFIG[freq as keyof typeof FREQ_CONFIG] ?? FREQ_CONFIG.semanal;
+          const next = CYCLE[freq];
+          const { Icon } = cfg;
+          return (
+            <button
+              title={`Clic para cambiar — actual: ${cfg.label}`}
+              onClick={(e) => { e.stopPropagation(); onFrecuenciaChange(p.id, p.nombre, next); }}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 5,
+                fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 99,
+                backgroundColor: cfg.bg, color: cfg.color,
+                border: "none", cursor: "pointer",
+              }}
+            >
+              <Icon size={12} />
+              {cfg.label}
+            </button>
           );
         },
       },
@@ -185,7 +223,7 @@ export function ProductosTable({ productos, categorias, onEdit, onDelete }: Prod
         },
       },
     ],
-    [catMap, onEdit, onDelete],
+    [catMap, onEdit, onDelete, onFrecuenciaChange],
   );
 
   const table = useReactTable({
