@@ -195,3 +195,11 @@ export interface FichaTecnica {
   created_at: string;
   producto?: Producto;
 }
+
+// ─── Cierre de turno ─────────────────────────────────────────────────────────
+
+export interface CierreTurnoResumen {
+  total_consumido_valor:  number;   // sum(qty_consumida * last_price) — last_price from DB post-RPC
+  diferencias_detectadas: number;   // items with diferencia < -0.5 AND > 15% variance
+  productos_bajo_minimo:  string[]; // nombres where post-RPC stock_actual < stock_minimo
+}

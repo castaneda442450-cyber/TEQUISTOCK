@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useEffect, useRef } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { toast } from "sonner";
+import { sileo } from "sileo";
 import { Plus, Search, X } from "lucide-react";
 import { deleteProducto, quickUpdateFrecuencia } from "@/lib/actions/productos.actions";
 import type { Producto, Categoria } from "@/types";
@@ -117,8 +117,8 @@ export default function ProductosClient({
   function confirmDelete() {
     if (!deleteTarget) return;
     deleteProducto(deleteTarget.id).then((res) => {
-      if (res.error) { toast.error(res.error); return; }
-      toast.success("Producto eliminado");
+      if (res.error) { sileo.error({ title: res.error }); return; }
+      sileo.success({ title: "Producto eliminado" });
       setDeleteTarget(null);
       router.refresh();
     });
@@ -127,8 +127,8 @@ export default function ProductosClient({
   async function handleFrecuenciaChange(id: string, nombre: string, freq: "diario" | "semanal" | "mensual") {
     const label = { diario: "Diario", semanal: "Semanal", mensual: "Mensual" }[freq];
     const res = await quickUpdateFrecuencia(id, freq);
-    if (res.error) { toast.error(res.error); return; }
-    toast.success(`${nombre} → ${label}`);
+    if (res.error) { sileo.error({ title: res.error }); return; }
+    sileo.success({ title: `${nombre} → ${label}` });
     startNavTransition(() => { router.refresh(); });
   }
 
@@ -175,25 +175,6 @@ export default function ProductosClient({
           )}
         </div>
 
-        {/* Filtros de frecuencia */}
-        <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-          {(["", "diario", "semanal", "mensual"] as const).map((v) => (
-            <button
-              key={v || "todos"}
-              onClick={() => updateUrlParams({ frecuencia: v || null, page: null })}
-              style={{
-                padding: "7px 14px", fontSize: 12, fontWeight: 600, borderRadius: 8, cursor: "pointer",
-                border: initialFrecuencia === v ? "none" : "1px solid hsl(var(--border))",
-                backgroundColor: initialFrecuencia === v ? "#0B4455" : "hsl(var(--surface))",
-                color: initialFrecuencia === v ? "white" : "hsl(var(--text-sub))",
-                fontFamily: "inherit",
-              }}
-            >
-              {{ "": "Todos", diario: "Diario", semanal: "Semanal", mensual: "Mensual" }[v]}
-            </button>
-          ))}
-        </div>
-
         {/* Categoría select */}
         <div style={{ position: "relative", zIndex: 10, flexShrink: 0 }}>
           <select
@@ -214,6 +195,25 @@ export default function ProductosClient({
               <option key={c.id} value={c.id}>{c.nombre}</option>
             ))}
           </select>
+        </div>
+
+        {/* Filtros de frecuencia */}
+        <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+          {(["", "diario", "semanal", "mensual"] as const).map((v) => (
+            <button
+              key={v || "todos"}
+              onClick={() => updateUrlParams({ frecuencia: v || null, page: null })}
+              style={{
+                padding: "7px 14px", fontSize: 12, fontWeight: 600, borderRadius: 8, cursor: "pointer",
+                border: initialFrecuencia === v ? "none" : "1px solid hsl(var(--border))",
+                backgroundColor: initialFrecuencia === v ? "#0B4455" : "hsl(var(--surface))",
+                color: initialFrecuencia === v ? "white" : "hsl(var(--text-sub))",
+                fontFamily: "inherit",
+              }}
+            >
+              {{ "": "Todos", diario: "Diario", semanal: "Semanal", mensual: "Mensual" }[v]}
+            </button>
+          ))}
         </div>
 
         {/* Acciones */}

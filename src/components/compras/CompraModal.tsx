@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useTransition, useMemo } from "react";
 import { useForm } from "react-hook-form";
-import { toast } from "sonner";
+import { sileo } from "sileo";
 import { X, Check, Loader2, Plus } from "lucide-react";
 import { ordenSchema, type OrdenInput } from "@/lib/schemas/compra.schema";
 import { createOrden, updateOrden } from "@/lib/actions/compras.actions";
@@ -155,7 +155,7 @@ export function CompraModal({
   function onSubmit(data: HeaderForm) {
     const validLines = lines.filter((l) => l.product_id && Number(l.qty) > 0 && Number(l.price) > 0);
     if (validLines.length === 0) {
-      toast.error("Agrega al menos un producto con cantidad y precio válidos");
+      sileo.error({ title: "Agrega al menos un producto con cantidad y precio válidos" });
       return;
     }
 
@@ -175,13 +175,13 @@ export function CompraModal({
     startTransition(async () => {
       if (editTarget) {
         const res = await updateOrden(editTarget.id, input);
-        if (res.error) { toast.error(res.error); return; }
-        toast.success("Compra actualizada");
+        if (res.error) { sileo.error({ title: res.error }); return; }
+        sileo.success({ title: "Compra actualizada" });
         onSuccess(res.data!);
       } else {
         const res = await createOrden(input);
-        if (res.error) { toast.error(res.error); return; }
-        toast.success("Compra registrada — stock actualizado");
+        if (res.error) { sileo.error({ title: res.error }); return; }
+        sileo.success({ title: "Compra registrada — stock actualizado" });
         onSuccess(res.data!);
       }
       onClose();

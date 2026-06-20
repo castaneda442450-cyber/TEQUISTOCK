@@ -3,7 +3,7 @@
 import { useTransition, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { toast } from "sonner";
+import { sileo } from "sileo";
 import { X, Check, Loader2 } from "lucide-react";
 import { proveedorFormSchema, type ProveedorFormValues } from "@/lib/schemas/proveedor.schema";
 import type { ProveedorInput } from "@/lib/schemas/proveedor.schema";
@@ -84,13 +84,13 @@ export function ProveedorModal({
     startTransition(async () => {
       if (editTarget) {
         const res = await updateProveedor(editTarget.id, payload);
-        if (res.error) { toast.error(res.error); return; }
-        toast.success("Proveedor actualizado");
+        if (res.error) { sileo.error({ title: res.error }); return; }
+        sileo.success({ title: "Proveedor actualizado" });
         onSuccess(res.data!);
       } else {
         const res = await createProveedor(payload);
-        if (res.error) { toast.error(res.error); return; }
-        toast.success("Proveedor creado");
+        if (res.error) { sileo.error({ title: res.error }); return; }
+        sileo.success({ title: "Proveedor creado" });
         onSuccess(res.data!);
       }
       onClose();

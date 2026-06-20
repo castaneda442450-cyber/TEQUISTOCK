@@ -3,7 +3,7 @@
 import { useEffect, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { toast } from "sonner";
+import { sileo } from "sileo";
 import { X, Check, Loader2, AlertTriangle } from "lucide-react";
 import { mermaSchema, type MermaInput } from "@/lib/schemas/salida.schema";
 import { createMerma } from "@/lib/actions/salidas.actions";
@@ -53,13 +53,13 @@ export function MermaModal({ open, productos, onClose, onSuccess }: MermaModalPr
 
   function onSubmit(data: MermaInput) {
     if (stockInsuficiente) {
-      toast.error(`Stock insuficiente. Disponible: ${selectedProd?.stock_actual} ${selectedProd?.unidad}`);
+      sileo.error({ title: `Stock insuficiente. Disponible: ${selectedProd?.stock_actual} ${selectedProd?.unidad}` });
       return;
     }
     startTransition(async () => {
       const res = await createMerma(data);
-      if (res.error) { toast.error(res.error); return; }
-      toast.success("Merma registrada");
+      if (res.error) { sileo.error({ title: res.error }); return; }
+      sileo.success({ title: "Merma registrada" });
       onSuccess(res.data!);
       onClose();
     });

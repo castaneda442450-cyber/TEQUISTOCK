@@ -10,15 +10,17 @@ import type {
   GastoProveedorResult,
   MermaResult,
   MovimientosResult,
+  ResumenSemanalResult,
 } from "@/lib/actions/reportes.actions";
 
-export type ReportType = "gastos_producto" | "gastos_proveedor" | "merma" | "movimientos";
+export type ReportType = "gastos_producto" | "gastos_proveedor" | "merma" | "movimientos" | "resumen_semanal";
 
 export type ReportData =
   | { type: "gastos_producto"; result: GastoProductoResult }
   | { type: "gastos_proveedor"; result: GastoProveedorResult }
   | { type: "merma"; result: MermaResult }
-  | { type: "movimientos"; result: MovimientosResult };
+  | { type: "movimientos"; result: MovimientosResult }
+  | { type: "resumen_semanal"; result: ResumenSemanalResult };
 
 export interface ReportPDFProps {
   reportData: ReportData;
@@ -31,6 +33,7 @@ const REPORT_NAMES: Record<ReportType, string> = {
   gastos_proveedor: "Gastos por Proveedor",
   merma: "Análisis de Merma",
   movimientos: "Movimientos de Inventario",
+  resumen_semanal: "Resumen Semanal de Inventario",
 };
 
 const s = StyleSheet.create({
@@ -91,6 +94,14 @@ const s = StyleSheet.create({
     justifyContent: "space-between",
   },
   footerText: { fontSize: 8, color: "#9CA3AF" },
+  metricRow: { flexDirection: "row", gap: 8, marginBottom: 8 },
+  metricCard: { flex: 1, backgroundColor: "#F3F4F6", borderRadius: 4, padding: 8 },
+  metricLabel: { fontSize: 7, color: "#6B7280", fontFamily: "Helvetica-Bold", marginBottom: 3 },
+  metricValue: { fontSize: 11, fontFamily: "Helvetica-Bold", color: "#0B4455" },
+  sectionTitle: { fontSize: 9, fontFamily: "Helvetica-Bold", color: "#0B4455", marginBottom: 6, marginTop: 14 },
+  highlightRow: { backgroundColor: "#FCEBEB" },
+  alertText: { fontSize: 8, color: "#BA3026", marginBottom: 3 },
+  successText: { fontSize: 8, color: "#106653" },
 });
 
 function Header({ type, desde, hasta }: { type: ReportType; desde: string; hasta: string }) {
@@ -257,6 +268,112 @@ function MovimientosTable({ result }: { result: MovimientosResult }) {
   );
 }
 
+const TENDENCIA_COLORS_PDF: Record<string, string> = {
+  mejorando: "#106653",
+  estable: "#C2972E",
+  empeorando: "#BA3026",
+};
+const TENDENCIA_LABELS_PDF: Record<string, string> = {
+  mejorando: "Mejorando",
+  estable: "Estable",
+  empeorando: "Empeorando",
+};
+
+function ResumenSemanalPDF({ result }: { result: ResumenSemanalResult }) {
+  const { resumen_general: rg, por_producto, alertas } = result;
+  const cols = [140, 70, 65, 75, 60];
+
+  return (
+    <View>
+      {/* Sección 1 — Métricas 2×2 */}
+      <Text style={s.sectionTitle}>RESUMEN EJECUTIVO</Text>
+      <View style={s.metricRow}>
+        <View style={s.metricCard}>
+          <Text style={s.metricLabel}>CIERRES REALIZADOS</Text>
+          <Text style={s.metricValue}>{rg.total_cierres} de 7</Text>
+        </View>
+        <View style={s.metricCard}>
+          <Text style={s.metricLabel}>VALOR CONSUMIDO</Text>
+          <Text style={[s.metricValue, { color: "#106653" }]}>{formatCurrency(rg.valor_consumido_total)}</Text>
+        </View>
+      </View>
+      <View style={[s.metricRow, { marginBottom: 14 }]}>
+        <View style={s.metricCard}>
+          <Text style={s.metricLabel}>MERMAS DETECTADAS</Text>
+          <Text style={[s.metricValue, { color: "#BA3026" }]}>{formatCurrency(rg.valor_merma_total)}</Text>
+        </View>
+        <View style={s.metricCard}>
+          <Text style={s.metricLabel}>DIFERENCIAS</Text>
+          <Text style={[s.metricValue, { color: "#C2972E" }]}>{rg.diferencias_detectadas} productos</Text>
+        </View>
+      </View>
+
+      {/* Sección 2 — Tabla por producto */}
+      {por_producto.length > 0 && (
+        <View>
+          <Text style={s.sectionTitle}>DETALLE POR PRODUCTO</Text>
+          <View style={s.tableHead}>
+            <Text style={[s.thText, { width: cols[0] }]}>PRODUCTO</Text>
+            <Text style={[s.thText, { width: cols[1], textAlign: "right" }]}>CONSUMO</Text>
+            <Text style={[s.thText, { width: cols[2], textAlign: "right" }]}>DIFERENCIA</Text>
+            <Text style={[s.thText, { width: cols[3], textAlign: "right" }]}>VALOR DIF.</Text>
+            <Text style={[s.thText, { width: cols[4], textAlign: "center" }]}>TENDENCIA</Text>
+          </View>
+          {por_producto.map((row, i) => {
+            const tColor = TENDENCIA_COLORS_PDF[row.tendencia] ?? "#1C2028";
+            const tLabel = TENDENCIA_LABELS_PDF[row.tendencia] ?? row.tendencia;
+            const isHighlight = row.diferencia_total < 0;
+            const rowStyle = [s.row, i % 2 === 0 ? s.rowEven : s.rowOdd, isHighlight ? s.highlightRow : {}];
+            return (
+              <View key={row.product_id} style={rowStyle}>
+                <View style={{ width: cols[0] }}>
+                  <Text style={s.cell}>{row.nombre}</Text>
+                  <Text style={s.cellMuted}>{row.unidad} · {row.categoria}</Text>
+                </View>
+                <Text style={[s.cellRight, { width: cols[1] }]}>{String(row.consumo_total_semana)}</Text>
+                <Text style={[s.cellRight, { width: cols[2], fontFamily: "Helvetica-Bold", color: row.diferencia_total < 0 ? "#BA3026" : "#106653" }]}>
+                  {row.diferencia_total > 0 ? "+" : ""}{row.diferencia_total.toFixed(2)}
+                </Text>
+                <Text style={[s.cellBold, { width: cols[3] }]}>{formatCurrency(Math.abs(row.valor_diferencia))}</Text>
+                <Text style={[s.cellCenter, { width: cols[4], fontFamily: "Helvetica-Bold", color: tColor }]}>{tLabel}</Text>
+              </View>
+            );
+          })}
+        </View>
+      )}
+
+      {/* Sección 3 — Alertas */}
+      <View>
+        <Text style={s.sectionTitle}>ALERTAS DE LA SEMANA</Text>
+        {alertas.length === 0 ? (
+          <Text style={s.successText}>Sin alertas esta semana — todo dentro de parametros normales.</Text>
+        ) : (
+          alertas.map((a, i) => (
+            <Text key={i} style={s.alertText}>{"• " + a}</Text>
+          ))
+        )}
+      </View>
+
+      {/* Sección 4 — Días sin cierre */}
+      <View>
+        <Text style={s.sectionTitle}>DIAS SIN CIERRE</Text>
+        {rg.dias_sin_cierre.length === 0 ? (
+          <Text style={s.successText}>Todos los dias registraron cierre correctamente.</Text>
+        ) : (
+          rg.dias_sin_cierre.map((d, i) => {
+            const fecha = new Date(d + "T00:00:00").toLocaleDateString("es-MX", {
+              weekday: "long", day: "numeric", month: "long",
+            });
+            return (
+              <Text key={i} style={s.alertText}>{fecha} — Sin registro de cierre ese dia.</Text>
+            );
+          })
+        )}
+      </View>
+    </View>
+  );
+}
+
 export function ReportPDF({ reportData, desde, hasta }: ReportPDFProps) {
   return (
     <Document>
@@ -271,6 +388,9 @@ export function ReportPDF({ reportData, desde, hasta }: ReportPDFProps) {
         )}
         {reportData.type === "merma" && <MermaTable result={reportData.result} />}
         {reportData.type === "movimientos" && <MovimientosTable result={reportData.result} />}
+        {reportData.type === "resumen_semanal" && (
+          <ResumenSemanalPDF result={reportData.result} />
+        )}
         <PDFFooter />
       </Page>
     </Document>

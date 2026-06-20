@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { toast } from "sonner";
+import { sileo } from "sileo";
 import { LogOut, Trash2, Plus } from "lucide-react";
 import { anularMovimiento } from "@/lib/actions/salidas.actions";
 import { formatCurrency, formatDate } from "@/lib/format";
@@ -53,9 +53,9 @@ export default function SalidasClient({ movimientos: initial, productos }: Props
     const id = deleteTarget.id;
     startTransition(async () => {
       const res = await anularMovimiento(id);
-      if (res.error) { toast.error(res.error); return; }
+      if (res.error) { sileo.error({ title: res.error }); return; }
       setMovimientos((prev) => prev.filter((m) => m.id !== id));
-      toast.success(deleteTarget.tipo === "salida" ? "Consumo anulado" : "Merma anulada");
+      sileo.success({ title: deleteTarget.tipo === "salida" ? "Consumo anulado" : "Merma anulada" });
       setDeleteTarget(null);
     });
   }

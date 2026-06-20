@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { toast } from "sonner";
+import { sileo } from "sileo";
 import { X, Check, Loader2, Tag, Trash2, AlertTriangle, Plus, ChevronDown } from "lucide-react";
 import { createCategoria, deleteCategoria } from "@/lib/actions/productos.actions";
 import type { Categoria } from "@/types";
@@ -48,7 +48,7 @@ export function CategoriaModal({ open, categorias, onClose, onCreated, onDeleted
       color: created.color,
       created_at: created.created_at ?? new Date().toISOString(),
     };
-    toast.success(`Categoría "${newCat.nombre}" creada`);
+    sileo.success({ title: `Categoría "${newCat.nombre}" creada` });
     setNombre("");
     setColor("#106653");
     onCreated(newCat);
@@ -58,7 +58,7 @@ export function CategoriaModal({ open, categorias, onClose, onCreated, onDeleted
     setDeletingId(cat.id);
     const res = await deleteCategoria(cat.id, undefined);
     setDeletingId(null);
-    if (res.error) { toast.error(res.error); return; }
+    if (res.error) { sileo.error({ title: res.error }); return; }
     if (res.affectedCount && res.affectedCount > 0) {
       const otras = categorias.filter((c) => c.id !== cat.id);
       setConfirm({
@@ -72,7 +72,7 @@ export function CategoriaModal({ open, categorias, onClose, onCreated, onDeleted
       });
       return;
     }
-    toast.success(`Categoría "${cat.nombre}" eliminada`);
+    sileo.success({ title: `Categoría "${cat.nombre}" eliminada` });
     onDeleted(cat.id);
   }
 
@@ -85,13 +85,13 @@ export function CategoriaModal({ open, categorias, onClose, onCreated, onDeleted
     if (confirm.mode === "nueva") {
       if (!confirm.nuevaNombre.trim()) {
         setConfirm((prev) => prev ? { ...prev, saving: false } : null);
-        toast.error("El nombre de la nueva categoría es requerido");
+        sileo.error({ title: "El nombre de la nueva categoría es requerido" });
         return;
       }
       const res = await createCategoria({ nombre: confirm.nuevaNombre.trim(), color: confirm.nuevaColor });
       if (res.error) {
         setConfirm((prev) => prev ? { ...prev, saving: false } : null);
-        toast.error(res.error);
+        sileo.error({ title: res.error });
         return;
       }
       const newCat: Categoria = {
@@ -108,13 +108,13 @@ export function CategoriaModal({ open, categorias, onClose, onCreated, onDeleted
     setConfirm(null);
 
     const res = await deleteCategoria(catToDelete.id, targetId);
-    if (res.error) { toast.error(res.error); return; }
+    if (res.error) { sileo.error({ title: res.error }); return; }
 
     const destNombre = confirm.mode === "nueva"
       ? confirm.nuevaNombre.trim()
       : categorias.find((c) => c.id === targetId)?.nombre ?? "otra categoría";
 
-    toast.success(`"${catToDelete.nombre}" eliminada. Productos movidos a "${destNombre}".`);
+    sileo.success({ title: `"${catToDelete.nombre}" eliminada. Productos movidos a "${destNombre}".` });
     onDeleted(catToDelete.id, true);
   }
 

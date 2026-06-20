@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/providers";
-import { Toaster } from "sonner";
+import { Toaster } from "sileo";
+import "sileo/styles.css";
 
 const plusJakarta = Plus_Jakarta_Sans({
   variable: "--font-plus-jakarta",
@@ -27,7 +28,7 @@ export default function RootLayout({
     <html lang="es" suppressHydrationWarning className={plusJakarta.variable}>
       <body suppressHydrationWarning className="min-h-screen bg-bg text-text-main antialiased">
         <Providers>{children}</Providers>
-        <Toaster richColors position="bottom-right" />
+        <Toaster position="bottom-right" theme="system" />
       </body>
     </html>
   );

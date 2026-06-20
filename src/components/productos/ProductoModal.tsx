@@ -3,7 +3,7 @@
 import { useTransition, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { toast } from "sonner";
+import { sileo } from "sileo";
 import { X, Check, Loader2, Sun, CalendarDays, CalendarCheck } from "lucide-react";
 import { productoSchema, type ProductoInput } from "@/lib/schemas/producto.schema";
 import {
@@ -105,13 +105,13 @@ export function ProductoModal({
     startTransition(async () => {
       if (editTarget) {
         const res = await updateProducto(editTarget.id, data);
-        if (res.error) { toast.error(res.error); return; }
-        toast.success("Producto actualizado");
+        if (res.error) { sileo.error({ title: res.error }); return; }
+        sileo.success({ title: "Producto actualizado" });
         onSuccess(res.data!);
       } else {
         const res = await createProducto(data);
-        if (res.error) { toast.error(res.error); return; }
-        toast.success("Producto creado");
+        if (res.error) { sileo.error({ title: res.error }); return; }
+        sileo.success({ title: "Producto creado" });
         onSuccess(res.data!);
       }
       onClose();

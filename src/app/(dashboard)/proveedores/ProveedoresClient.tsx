@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useEffect, useRef, useMemo } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { toast } from "sonner";
+import { sileo } from "sileo";
 import {
   Plus, Search, X, Users, Mail, Phone, Pencil, Trash2,
   Package, ChevronDown, CheckCircle2,
@@ -120,8 +120,8 @@ export default function ProveedoresClient({
   function confirmDelete() {
     if (!selectedProveedor) return;
     deleteProveedor(selectedProveedor.id).then((res) => {
-      if (res.error) { toast.error(res.error); return; }
-      toast.success("Proveedor eliminado");
+      if (res.error) { sileo.error({ title: res.error }); return; }
+      sileo.success({ title: "Proveedor eliminado" });
       setProveedores((prev) => prev.filter((x) => x.id !== selectedProveedor.id));
       setShowModal(null);
       setSelectedProveedor(null);

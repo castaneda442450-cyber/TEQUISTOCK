@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Eye, EyeOff, Lock, User } from "lucide-react";
 import Image from "next/image";
-import { toast } from "sonner";
+import { sileo } from "sileo";
 import { signIn } from "@/lib/actions/auth.actions";
 import { loginSchema, type LoginInput } from "@/lib/schemas/auth.schema";
 
@@ -101,13 +101,13 @@ function LoginForm() {
     try {
       const result = await signIn(data);
       if (result?.error) {
-        toast.error(result.error);
+        sileo.error({ title: result.error });
       } else {
         router.push("/dashboard");
         router.refresh();
       }
     } catch {
-      toast.error("Error inesperado. Intenta nuevamente.");
+      sileo.error({ title: "Error inesperado. Intenta nuevamente." });
     } finally {
       setLoading(false);
     }

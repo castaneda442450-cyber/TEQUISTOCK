@@ -7,12 +7,14 @@ import { useState, useEffect } from "react";
 import {
   LayoutDashboard,
   Package,
-  Users,
+  Truck,
   ShoppingCart,
-  FileText,
+  ClipboardCheck,
+  ArrowRightFromLine,
+  BookOpen,
+  BarChart3,
   ChevronLeft,
   ChevronRight,
-  TrendingDown,
   Moon,
   Sun,
   LogOut,
@@ -21,13 +23,50 @@ import { cn } from "@/lib/utils";
 import { signOut } from "@/lib/actions/auth.actions";
 import { useTheme } from "next-themes";
 
-const NAV_ITEMS = [
-  { href: "/dashboard",   label: "Dashboard",   icon: LayoutDashboard },
-  { href: "/productos",   label: "Productos",   icon: Package },
-  { href: "/proveedores", label: "Proveedores", icon: Users },
-  { href: "/compras",     label: "Compras",     icon: ShoppingCart },
-  { href: "/salidas",     label: "Salidas",     icon: TrendingDown },
-  { href: "/reportes",    label: "Reportes",    icon: FileText },
+interface NavItem {
+  href: string;
+  label: string;
+  icon: React.ElementType;
+  badgeAlert?: boolean;
+  badgeDiff?: boolean;
+  badgeBeta?: boolean;
+  tooltip?: string;
+}
+
+interface NavSection {
+  label: string;
+  items: NavItem[];
+}
+
+const NAV_SECTIONS: NavSection[] = [
+  {
+    label: "PRINCIPAL",
+    items: [
+      { href: "/dashboard",   label: "Dashboard",   icon: LayoutDashboard },
+      { href: "/productos",   label: "Productos",   icon: Package },
+      { href: "/proveedores", label: "Proveedores", icon: Truck },
+      { href: "/compras",     label: "Compras",     icon: ShoppingCart },
+    ],
+  },
+  {
+    label: "CONTROL DIARIO",
+    items: [
+      { href: "/turno", label: "Cierre de Turno", icon: ClipboardCheck, badgeAlert: true, badgeDiff: true },
+    ],
+  },
+  {
+    label: "GESTIÓN",
+    items: [
+      { href: "/salidas", label: "Salidas y Mermas", icon: ArrowRightFromLine },
+      { href: "/fichas",  label: "Fichas Técnicas",  icon: BookOpen, badgeBeta: true },
+    ],
+  },
+  {
+    label: "REPORTES",
+    items: [
+      { href: "/reportes", label: "Reportes", icon: BarChart3, tooltip: "Incluye el nuevo reporte semanal de cierres" },
+    ],
+  },
 ];
 
 function SidebarThemeToggle({ collapsed }: { collapsed: boolean }) {
@@ -80,10 +119,16 @@ function SidebarThemeToggle({ collapsed }: { collapsed: boolean }) {
   );
 }
 
-export function Sidebar() {
+interface SidebarProps {
+  productosBajoMinimo: number;
+  diferenciasPendientes: number;
+}
+
+export function Sidebar({ productosBajoMinimo, diferenciasPendientes }: SidebarProps) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [hoveredHref, setHoveredHref] = useState<string | null>(null);
 
   const handleSignOut = async () => {
     setSigningOut(true);
@@ -139,65 +184,135 @@ export function Sidebar() {
         )}
       </div>
 
-      {/* Nav items */}
-      <nav style={{ flex: 1, padding: "12px 8px", display: "flex", flexDirection: "column", gap: 2, overflowY: "auto" }}>
-        {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-          const isActive = pathname === href || pathname.startsWith(href + "/");
-          return (
-            <Link
-              key={href}
-              href={href}
-              title={collapsed ? label : undefined}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                padding: collapsed ? "11px 8px" : "10px 12px",
-                justifyContent: collapsed ? "center" : "flex-start",
-                borderRadius: 8,
-                backgroundColor: isActive ? "hsl(var(--terracota))" : "transparent",
-                transition: "background-color 0.15s ease",
-                position: "relative",
-                textDecoration: "none",
-              }}
-              onMouseEnter={(e) => {
-                if (!isActive) (e.currentTarget as HTMLElement).style.backgroundColor = "rgba(255,255,255,0.10)";
-              }}
-              onMouseLeave={(e) => {
-                if (!isActive) (e.currentTarget as HTMLElement).style.backgroundColor = "transparent";
-              }}
-            >
-              <Icon
-                size={18}
-                style={{ flexShrink: 0, color: isActive ? "white" : "rgba(255,255,255,0.88)" }}
-              />
-              {!collapsed && (
-                <span style={{ fontSize: 14, fontWeight: 500, color: isActive ? "white" : "rgba(255,255,255,0.88)" }}>
-                  {label}
-                </span>
-              )}
-              {collapsed && (
-                <span style={{
-                  position: "absolute",
-                  left: "100%",
-                  marginLeft: 8,
-                  padding: "4px 8px",
-                  background: "#1a1a2e",
-                  color: "white",
-                  fontSize: 12,
-                  borderRadius: 6,
-                  opacity: 0,
-                  pointerEvents: "none",
-                  whiteSpace: "nowrap",
-                  zIndex: 100,
-                  boxShadow: "0 4px 12px rgba(0,0,0,0.4)",
-                }}>
-                  {label}
-                </span>
-              )}
-            </Link>
-          );
-        })}
+      {/* Nav sections */}
+      <nav style={{ flex: 1, padding: "8px 8px", display: "flex", flexDirection: "column", overflowY: "auto" }}>
+        {NAV_SECTIONS.map((section) => (
+          <div key={section.label}>
+            {!collapsed && (
+              <div style={{
+                fontSize: 10,
+                color: "rgba(255,255,255,0.35)",
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+                padding: "10px 14px 4px 14px",
+                fontWeight: 500,
+              }}>
+                {section.label}
+              </div>
+            )}
+            {collapsed && <div style={{ height: 8 }} />}
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              {section.items.map(({ href, label, icon: Icon, badgeAlert, badgeDiff, badgeBeta, tooltip }) => {
+                const isActive = pathname === href || pathname.startsWith(href + "/");
+                const showBadgeAlert = !collapsed && badgeAlert && productosBajoMinimo > 0;
+                const showBadgeDiff = !collapsed && badgeDiff && diferenciasPendientes > 0 && !showBadgeAlert;
+
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    title={collapsed ? label : undefined}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 12,
+                      padding: collapsed ? "11px 8px" : "10px 12px",
+                      justifyContent: collapsed ? "center" : "flex-start",
+                      borderRadius: 8,
+                      backgroundColor: isActive ? "rgba(255,255,255,0.15)" : "transparent",
+                      transition: "background-color 0.15s ease",
+                      position: "relative",
+                      textDecoration: "none",
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isActive) (e.currentTarget as HTMLElement).style.backgroundColor = "rgba(255,255,255,0.08)";
+                      if (tooltip) setHoveredHref(href);
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isActive) (e.currentTarget as HTMLElement).style.backgroundColor = "transparent";
+                      if (tooltip) setHoveredHref(null);
+                    }}
+                  >
+                    <Icon
+                      size={18}
+                      style={{ flexShrink: 0, color: isActive ? "white" : "rgba(255,255,255,0.65)" }}
+                    />
+                    {!collapsed && (
+                      <span style={{ fontSize: 14, fontWeight: isActive ? 500 : 400, color: isActive ? "white" : "rgba(255,255,255,0.65)" }}>
+                        {label}
+                      </span>
+                    )}
+
+                    {/* Badge "!" — productos bajo mínimo */}
+                    {showBadgeAlert && (
+                      <span style={{
+                        width: 18, height: 18, borderRadius: "50%",
+                        background: "#BA3026", color: "white",
+                        fontSize: 10, fontWeight: 700,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        marginLeft: "auto", flexShrink: 0,
+                      }}>!</span>
+                    )}
+
+                    {/* Badge numérico — diferencias pendientes */}
+                    {showBadgeDiff && (
+                      <span style={{
+                        minWidth: 18, height: 18, borderRadius: 9,
+                        background: "rgba(255,255,255,0.20)", color: "white",
+                        fontSize: 10, fontWeight: 700, padding: "0 5px",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        marginLeft: "auto", flexShrink: 0,
+                      }}>{diferenciasPendientes}</span>
+                    )}
+
+                    {/* Badge "Beta" */}
+                    {!collapsed && badgeBeta && (
+                      <span style={{
+                        fontSize: 9, background: "rgba(255,255,255,0.12)",
+                        color: "rgba(255,255,255,0.5)", padding: "1px 6px",
+                        borderRadius: 4, marginLeft: "auto", flexShrink: 0,
+                      }}>Beta</span>
+                    )}
+
+                    {/* Tooltip para items con texto descriptivo */}
+                    {tooltip && hoveredHref === href && !collapsed && (
+                      <div style={{
+                        position: "absolute", left: "100%", top: "50%",
+                        transform: "translateY(-50%)", marginLeft: 8,
+                        background: "#1a1a2e", color: "white", fontSize: 11,
+                        borderRadius: 6, padding: "5px 10px", whiteSpace: "nowrap",
+                        boxShadow: "0 4px 12px rgba(0,0,0,0.4)", zIndex: 100,
+                        pointerEvents: "none",
+                      }}>{tooltip}</div>
+                    )}
+
+                    {/* Tooltip de label cuando colapsado */}
+                    {collapsed && (
+                      <span style={{
+                        position: "absolute",
+                        left: "100%",
+                        marginLeft: 8,
+                        padding: "4px 8px",
+                        background: "#1a1a2e",
+                        color: "white",
+                        fontSize: 12,
+                        borderRadius: 6,
+                        opacity: 0,
+                        pointerEvents: "none",
+                        whiteSpace: "nowrap",
+                        zIndex: 100,
+                        boxShadow: "0 4px 12px rgba(0,0,0,0.4)",
+                      }}>
+                        {label}
+                      </span>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
 
       {/* Bottom controls */}

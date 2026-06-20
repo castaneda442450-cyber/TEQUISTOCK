@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useTransition } from "react";
-import { toast } from "sonner";
+import { sileo } from "sileo";
 import { ChevronDown, ChevronUp, Plus, Eye, Pencil, Trash2, FileText } from "lucide-react";
 import { deleteOrden } from "@/lib/actions/compras.actions";
 import { formatCurrency, formatDate } from "@/lib/format";
@@ -94,11 +94,11 @@ export default function ComprasClient({ ordenes: initial, proveedores, productos
     startTransition(async () => {
       const res = await deleteOrden(id);
       if (res.error) {
-        toast.error(res.error);
+        sileo.error({ title: res.error });
         return;
       }
       setOrdenes((prev) => prev.filter((o) => o.id !== id));
-      toast.success("Compra eliminada");
+      sileo.success({ title: "Compra eliminada" });
       closeModal();
     });
   }

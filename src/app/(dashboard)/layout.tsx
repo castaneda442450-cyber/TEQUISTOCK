@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/actions/auth.actions";
+import { getSidebarAlerts } from "@/lib/actions/dashboard.actions";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TopBar } from "@/components/layout/TopBar";
 
@@ -11,9 +12,14 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
   const { user } = await getSession();
   if (!user) redirect("/login");
 
+  const alerts = await getSidebarAlerts();
+
   return (
     <div className="flex h-screen overflow-hidden" style={{ backgroundColor: "hsl(var(--bg))" }}>
-      <Sidebar />
+      <Sidebar
+        productosBajoMinimo={alerts.productosBajoMinimo}
+        diferenciasPendientes={alerts.diferenciasPendientes}
+      />
 
       <div
         className="flex-1 flex flex-col min-w-0"
