@@ -23,7 +23,7 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
 
       <div
         className="flex-1 flex flex-col min-w-0"
-        style={{ marginLeft: "240px" }}
+        style={{ marginLeft: "var(--sidebar-width, 240px)", transition: "margin-left 0.3s ease" }}
       >
         <TopBar userEmail={user.username} />
 

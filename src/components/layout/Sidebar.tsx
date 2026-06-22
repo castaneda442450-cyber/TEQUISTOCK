@@ -130,6 +130,13 @@ export function Sidebar({ productosBajoMinimo, diferenciasPendientes }: SidebarP
   const [signingOut, setSigningOut] = useState(false);
   const [hoveredHref, setHoveredHref] = useState<string | null>(null);
 
+  useEffect(() => {
+    document.documentElement.style.setProperty(
+      '--sidebar-width',
+      collapsed ? '72px' : '240px'
+    );
+  }, [collapsed]);
+
   const handleSignOut = async () => {
     setSigningOut(true);
     await signOut();

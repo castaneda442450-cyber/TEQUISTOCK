@@ -24,6 +24,7 @@
   --shadow-color: rgba(28, 23, 20, 0.05);
   --shadow-color-md: rgba(28, 23, 20, 0.08);
   --shadow-color-lg: rgba(28, 23, 20, 0.16);
+  --sidebar-width: 240px;
 }
 
 /* Cloud Design Tokens - Dark Mode */
@@ -133,7 +134,14 @@ input:focus, textarea:focus, select:focus {
   background: hsl(var(--text-muted));
 }
 
-/* === Sileo Toast — Colores custom por estado y modo === */
+/* === Sileo Toast — Layout y colores custom === */
+
+[data-sileo-toast] {
+  width: fit-content !important;
+  min-width: 180px;
+}
+
+
 
 /* SUCCESS - modo claro: fondo verde oscuro, texto blanco */
 [data-sileo-toast][data-state="success"] [data-sileo-pill],
