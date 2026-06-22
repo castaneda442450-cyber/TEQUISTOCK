@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { sileo } from "sileo";
 import { X, Check, Loader2 } from "lucide-react";
+import { ProductoSearchSelect } from "@/components/ui/ProductoSearchSelect";
 import { consumoSchema, type ConsumoInput } from "@/lib/schemas/salida.schema";
 import { createConsumo } from "@/lib/actions/salidas.actions";
 import { formatCurrency } from "@/lib/format";
@@ -20,7 +21,7 @@ interface ConsumoModalProps {
 export function ConsumoModal({ open, productos, onClose, onSuccess }: ConsumoModalProps) {
   const [isPending, startTransition] = useTransition();
 
-  const { register, handleSubmit, watch, reset, formState: { errors } } = useForm<ConsumoInput>({
+  const { register, handleSubmit, watch, reset, setValue, formState: { errors } } = useForm<ConsumoInput>({
     resolver: zodResolver(consumoSchema),
     defaultValues: {
       product_id: productos[0]?.id ?? "",
@@ -121,17 +122,12 @@ export function ConsumoModal({ open, productos, onClose, onSuccess }: ConsumoMod
             {/* Producto */}
             <div>
               <label style={labelStyle}>Producto *</label>
-              <select
-                {...register("product_id")}
-                style={inputStyle(!!errors.product_id)}
-              >
-                <option value="">Seleccionar producto...</option>
-                {productos.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nombre} — Stock: {p.stock_actual} {p.unidad}
-                  </option>
-                ))}
-              </select>
+              <ProductoSearchSelect
+                productos={productos}
+                value={productId}
+                onChange={(id) => setValue("product_id", id, { shouldValidate: true })}
+                hasError={!!errors.product_id}
+              />
               {errors.product_id && <p style={errorStyle}>{errors.product_id.message}</p>}
             </div>
 

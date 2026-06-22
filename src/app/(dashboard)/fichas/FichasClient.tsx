@@ -3,6 +3,7 @@
 import { useState, useMemo, useTransition } from "react";
 import { Info, ChevronDown, ChevronRight, Plus, Minus, X, Pencil, Trash2, ChefHat } from "lucide-react";
 import { sileo } from "sileo";
+import { ProductoSearchSelect } from "@/components/ui/ProductoSearchSelect";
 import type { FichaTecnica, Producto } from "@/types";
 import {
   createFichasPlatillo,
@@ -271,29 +272,12 @@ function NuevoPlatilloModal({
                     alignItems: "center",
                   }}
                 >
-                  <select
+                  <ProductoSearchSelect
+                    productos={productos}
                     value={line.producto_id}
-                    onChange={(e) => updateLine(i, "producto_id", e.target.value)}
-                    style={{
-                      width: "100%",
-                      padding: "8px 10px",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: 8,
-                      fontSize: 13,
-                      color: line.producto_id ? "hsl(var(--text-main))" : "hsl(var(--text-muted))",
-                      background: "hsl(var(--surface))",
-                      outline: "none",
-                      cursor: "pointer",
-                      fontFamily: "inherit",
-                    }}
-                  >
-                    <option value="">Selecciona un producto...</option>
-                    {productos.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.nombre} ({p.unidad})
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(id) => updateLine(i, "producto_id", id)}
+                    placeholder="Selecciona un producto..."
+                  />
 
                   <input
                     type="number"

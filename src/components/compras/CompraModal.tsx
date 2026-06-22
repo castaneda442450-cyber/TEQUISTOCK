@@ -4,6 +4,7 @@ import { useState, useEffect, useTransition, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { sileo } from "sileo";
 import { X, Check, Loader2, Plus } from "lucide-react";
+import { ProductoSearchSelect } from "@/components/ui/ProductoSearchSelect";
 import { ordenSchema, type OrdenInput } from "@/lib/schemas/compra.schema";
 import { createOrden, updateOrden } from "@/lib/actions/compras.actions";
 import { formatCurrency } from "@/lib/format";
@@ -317,34 +318,12 @@ export function CompraModal({
                 {lines.map((line, i) => (
                   <div key={i}>
                     <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 32px", gap: 8, alignItems: "center" }}>
-                      {/* Selector de producto con optgroups */}
-                      <select
+                      {/* Buscador de producto */}
+                      <ProductoSearchSelect
+                        productos={[...supplierProds, ...otherProds]}
                         value={line.product_id}
-                        onChange={(e) => updateLine(i, "product_id", e.target.value)}
-                        style={inputStyle(false)}
-                      >
-                        <option value="">Seleccionar producto...</option>
-                        {supplierProds.length > 0 ? (
-                          <>
-                            <optgroup label={`— Productos de este proveedor (${supplierProds.length}) —`}>
-                              {supplierProds.map((p) => (
-                                <option key={p.id} value={p.id}>{p.nombre} ({p.unidad})</option>
-                              ))}
-                            </optgroup>
-                            {otherProds.length > 0 && (
-                              <optgroup label={`— Otros productos (${otherProds.length}) —`}>
-                                {otherProds.map((p) => (
-                                  <option key={p.id} value={p.id}>{p.nombre} ({p.unidad})</option>
-                                ))}
-                              </optgroup>
-                            )}
-                          </>
-                        ) : (
-                          productos.map((p) => (
-                            <option key={p.id} value={p.id}>{p.nombre} ({p.unidad})</option>
-                          ))
-                        )}
-                      </select>
+                        onChange={(id) => updateLine(i, "product_id", id)}
+                      />
 
                       <input
                         type="number"
