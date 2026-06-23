@@ -134,67 +134,23 @@ input:focus, textarea:focus, select:focus {
   background: hsl(var(--text-muted));
 }
 
-/* === Sileo Toast — Layout y colores custom === */
+/* === Sileo Toast Colors === */
 
-[data-sileo-toast] {
-  width: fit-content !important;
-  min-width: 180px;
-}
-
-
-
-/* SUCCESS - modo claro: fondo verde oscuro, texto blanco */
-[data-sileo-toast][data-state="success"] [data-sileo-pill],
-[data-sileo-toast][data-state="success"] [data-sileo-body] {
-  fill: #106653 !important;
-}
-[data-sileo-toast][data-state="success"] {
-  --sileo-state-success: #FFFFFF;
+/* Modo claro */
+:root {
+  --sileo-state-success: oklch(0.35 0.12 142);
+  --sileo-state-error:   oklch(0.35 0.18 25);
+  --sileo-state-info:    oklch(0.20 0 0);
+  --sileo-state-warning: oklch(0.50 0.15 86);
+  --sileo-width: 360px;
 }
 
-/* SUCCESS - modo oscuro: fondo verde claro, texto oscuro */
-.dark [data-sileo-toast][data-state="success"] [data-sileo-pill],
-.dark [data-sileo-toast][data-state="success"] [data-sileo-body] {
-  fill: #34D399 !important;
-}
-.dark [data-sileo-toast][data-state="success"] {
-  --sileo-state-success: #0a2e22;
-}
-
-/* ERROR - modo claro: fondo rojo oscuro, texto blanco */
-[data-sileo-toast][data-state="error"] [data-sileo-pill],
-[data-sileo-toast][data-state="error"] [data-sileo-body] {
-  fill: #7f1a12 !important;
-}
-[data-sileo-toast][data-state="error"] {
-  --sileo-state-error: #FFFFFF;
-}
-
-/* ERROR - modo oscuro: fondo rojo claro, texto oscuro */
-.dark [data-sileo-toast][data-state="error"] [data-sileo-pill],
-.dark [data-sileo-toast][data-state="error"] [data-sileo-body] {
-  fill: #FCA5A5 !important;
-}
-.dark [data-sileo-toast][data-state="error"] {
-  --sileo-state-error: #450a0a;
-}
-
-/* INFO - modo claro: fondo muy oscuro, texto blanco */
-[data-sileo-toast][data-state="info"] [data-sileo-pill],
-[data-sileo-toast][data-state="info"] [data-sileo-body] {
-  fill: #1C1714 !important;
-}
-[data-sileo-toast][data-state="info"] {
-  --sileo-state-info: #FFFFFF;
-}
-
-/* INFO - modo oscuro: fondo crema, texto oscuro */
-.dark [data-sileo-toast][data-state="info"] [data-sileo-pill],
-.dark [data-sileo-toast][data-state="info"] [data-sileo-body] {
-  fill: #F5F0EB !important;
-}
-.dark [data-sileo-toast][data-state="info"] {
-  --sileo-state-info: #1C1714;
+/* Modo oscuro */
+.dark {
+  --sileo-state-success: oklch(0.75 0.18 142);
+  --sileo-state-error:   oklch(0.72 0.18 25);
+  --sileo-state-info:    oklch(0.92 0 0);
+  --sileo-state-warning: oklch(0.80 0.15 86);
 }
 
 /* === Responsive Tablet (iPad A16) — max 1100px === */

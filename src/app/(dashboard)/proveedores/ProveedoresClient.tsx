@@ -120,8 +120,8 @@ export default function ProveedoresClient({
   function confirmDelete() {
     if (!selectedProveedor) return;
     deleteProveedor(selectedProveedor.id).then((res) => {
-      if (res.error) { sileo.error({ title: res.error }); return; }
-      sileo.success({ title: "Proveedor eliminado" });
+      if (res.error) { sileo.error({ title: res.error, description: "Por favor intenta nuevamente." }); return; }
+      sileo.success({ title: "Proveedor eliminado", description: "El proveedor fue eliminado del sistema." });
       setProveedores((prev) => prev.filter((x) => x.id !== selectedProveedor.id));
       setShowModal(null);
       setSelectedProveedor(null);

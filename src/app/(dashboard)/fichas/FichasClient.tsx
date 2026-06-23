@@ -86,7 +86,7 @@ function NuevoPlatilloModal({
         setFormError(result.error);
         return;
       }
-      sileo.success({ title: `Platillo "${platilloNombre.trim()}" guardado` });
+      sileo.success({ title: `Platillo "${platilloNombre.trim()}" guardado`, description: "La ficha técnica fue guardada correctamente." });
       onClose();
     });
   };
@@ -662,16 +662,16 @@ function PlatilloCard({
   const handleToggleActivo = () => {
     startToggleTransition(async () => {
       const result = await toggleFichaActivo(nombre, !activo);
-      if (result.error) sileo.error({ title: result.error });
-      else sileo.success({ title: activo ? "Ficha desactivada" : "Ficha activada" });
+      if (result.error) sileo.error({ title: result.error, description: "Por favor intenta nuevamente." });
+      else sileo.success({ title: activo ? "Ficha desactivada" : "Ficha activada", description: "El estado se actualizó correctamente." });
     });
   };
 
   const handleDeletePlatillo = () => {
     startDeleteTransition(async () => {
       const result = await deletePlatillo(nombre);
-      if (result.error) sileo.error({ title: result.error });
-      else sileo.success({ title: `Platillo "${nombre}" eliminado` });
+      if (result.error) sileo.error({ title: result.error, description: "Por favor intenta nuevamente." });
+      else sileo.success({ title: `Platillo "${nombre}" eliminado`, description: "La ficha técnica fue eliminada." });
       setDeleteTarget(null);
     });
   };

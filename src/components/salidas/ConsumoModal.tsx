@@ -54,13 +54,13 @@ export function ConsumoModal({ open, productos, onClose, onSuccess }: ConsumoMod
 
   function onSubmit(data: ConsumoInput) {
     if (stockInsuficiente) {
-      sileo.error({ title: `Stock insuficiente. Disponible: ${selectedProd?.stock_actual} ${selectedProd?.unidad}` });
+      sileo.error({ title: `Stock insuficiente. Disponible: ${selectedProd?.stock_actual} ${selectedProd?.unidad}`, description: "No puedes consumir más de lo disponible." });
       return;
     }
     startTransition(async () => {
       const res = await createConsumo(data);
-      if (res.error) { sileo.error({ title: res.error }); return; }
-      sileo.success({ title: "Consumo registrado" });
+      if (res.error) { sileo.error({ title: res.error, description: "Por favor intenta nuevamente." }); return; }
+      sileo.success({ title: "Consumo registrado", description: "El stock fue descontado del inventario." });
       onSuccess(res.data!);
       onClose();
     });

@@ -55,13 +55,13 @@ export function MermaModal({ open, productos, onClose, onSuccess }: MermaModalPr
 
   function onSubmit(data: MermaInput) {
     if (stockInsuficiente) {
-      sileo.error({ title: `Stock insuficiente. Disponible: ${selectedProd?.stock_actual} ${selectedProd?.unidad}` });
+      sileo.error({ title: `Stock insuficiente. Disponible: ${selectedProd?.stock_actual} ${selectedProd?.unidad}`, description: "No puedes registrar más de lo disponible." });
       return;
     }
     startTransition(async () => {
       const res = await createMerma(data);
-      if (res.error) { sileo.error({ title: res.error }); return; }
-      sileo.success({ title: "Merma registrada" });
+      if (res.error) { sileo.error({ title: res.error, description: "Por favor intenta nuevamente." }); return; }
+      sileo.success({ title: "Merma registrada", description: "El movimiento quedó registrado en el sistema." });
       onSuccess(res.data!);
       onClose();
     });

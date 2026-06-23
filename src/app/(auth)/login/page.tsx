@@ -101,13 +101,13 @@ function LoginForm() {
     try {
       const result = await signIn(data);
       if (result?.error) {
-        sileo.error({ title: result.error });
+        sileo.error({ title: result.error, description: "Verifica tus credenciales e intenta de nuevo." });
       } else {
         router.push("/dashboard");
         router.refresh();
       }
     } catch {
-      sileo.error({ title: "Error inesperado. Intenta nuevamente." });
+      sileo.error({ title: "Error inesperado. Intenta nuevamente.", description: "Verifica tus credenciales e intenta de nuevo." });
     } finally {
       setLoading(false);
     }

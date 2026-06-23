@@ -55,9 +55,9 @@ export default function SalidasClient({ movimientos: initial, productos }: Props
     const id = deleteTarget.id;
     startTransition(async () => {
       const res = await anularMovimiento(id);
-      if (res.error) { sileo.error({ title: res.error }); return; }
+      if (res.error) { sileo.error({ title: res.error, description: "Por favor intenta nuevamente." }); return; }
       setMovimientos((prev) => prev.filter((m) => m.id !== id));
-      sileo.success({ title: deleteTarget.tipo === "salida" ? "Consumo anulado" : "Merma anulada" });
+      sileo.success({ title: deleteTarget.tipo === "salida" ? "Consumo anulado" : "Merma anulada", description: "El movimiento fue revertido del inventario." });
       setDeleteTarget(null);
     });
   }

@@ -96,11 +96,11 @@ export default function ComprasClient({ ordenes: initial, proveedores, productos
     startTransition(async () => {
       const res = await deleteOrden(id);
       if (res.error) {
-        sileo.error({ title: res.error });
+        sileo.error({ title: res.error, description: "Por favor intenta nuevamente." });
         return;
       }
       setOrdenes((prev) => prev.filter((o) => o.id !== id));
-      sileo.success({ title: "Compra eliminada" });
+      sileo.success({ title: "Compra eliminada", description: "La compra fue eliminada del historial." });
       closeModal();
     });
   }

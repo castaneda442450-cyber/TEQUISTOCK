@@ -84,13 +84,13 @@ export function ProveedorModal({
     startTransition(async () => {
       if (editTarget) {
         const res = await updateProveedor(editTarget.id, payload);
-        if (res.error) { sileo.error({ title: res.error }); return; }
-        sileo.success({ title: "Proveedor actualizado" });
+        if (res.error) { sileo.error({ title: res.error, description: "Por favor intenta nuevamente." }); return; }
+        sileo.success({ title: "Proveedor actualizado", description: "Los cambios se guardaron correctamente." });
         onSuccess(res.data!);
       } else {
         const res = await createProveedor(payload);
-        if (res.error) { sileo.error({ title: res.error }); return; }
-        sileo.success({ title: "Proveedor creado" });
+        if (res.error) { sileo.error({ title: res.error, description: "Por favor intenta nuevamente." }); return; }
+        sileo.success({ title: "Proveedor creado", description: "El proveedor se agregó al sistema." });
         onSuccess(res.data!);
       }
       onClose();

@@ -119,8 +119,8 @@ export default function ProductosClient({
   function confirmDelete() {
     if (!deleteTarget) return;
     deleteProducto(deleteTarget.id).then((res) => {
-      if (res.error) { sileo.error({ title: res.error }); return; }
-      sileo.success({ title: "Producto eliminado" });
+      if (res.error) { sileo.error({ title: res.error, description: "Por favor intenta nuevamente." }); return; }
+      sileo.success({ title: "Producto eliminado", description: "El producto fue eliminado del inventario." });
       setDeleteTarget(null);
       router.refresh();
     });
@@ -129,7 +129,7 @@ export default function ProductosClient({
   async function handleFrecuenciaChange(id: string, nombre: string, freq: "diario" | "semanal" | "mensual") {
     const label = { diario: "Diario", semanal: "Semanal", mensual: "Mensual" }[freq];
     const res = await quickUpdateFrecuencia(id, freq);
-    if (res.error) { sileo.error({ title: res.error }); return; }
+    if (res.error) { sileo.error({ title: res.error, description: "Por favor intenta nuevamente." }); return; }
     sileo.success({ title: `${nombre} → ${label}` });
     startNavTransition(() => { router.refresh(); });
   }

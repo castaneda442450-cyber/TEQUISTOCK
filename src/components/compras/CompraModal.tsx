@@ -158,7 +158,7 @@ export function CompraModal({
   function onSubmit(data: HeaderForm) {
     const validLines = lines.filter((l) => l.product_id && Number(l.qty) > 0 && Number(l.price) > 0);
     if (validLines.length === 0) {
-      sileo.error({ title: "Agrega al menos un producto con cantidad y precio válidos" });
+      sileo.error({ title: "Agrega al menos un producto con cantidad y precio válidos", description: "Verifica las cantidades y precios antes de continuar." });
       return;
     }
 
@@ -178,13 +178,13 @@ export function CompraModal({
     startTransition(async () => {
       if (editTarget) {
         const res = await updateOrden(editTarget.id, input);
-        if (res.error) { sileo.error({ title: res.error }); return; }
-        sileo.success({ title: "Compra actualizada" });
+        if (res.error) { sileo.error({ title: res.error, description: "Por favor intenta nuevamente." }); return; }
+        sileo.success({ title: "Compra actualizada", description: "Los cambios se guardaron correctamente." });
         onSuccess(res.data!);
       } else {
         const res = await createOrden(input);
-        if (res.error) { sileo.error({ title: res.error }); return; }
-        sileo.success({ title: "Compra registrada — stock actualizado" });
+        if (res.error) { sileo.error({ title: res.error, description: "Por favor intenta nuevamente." }); return; }
+        sileo.success({ title: "Compra registrada — stock actualizado", description: "El inventario se actualizó con las cantidades recibidas." });
         onSuccess(res.data!);
       }
       onClose();

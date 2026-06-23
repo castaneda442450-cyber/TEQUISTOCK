@@ -107,13 +107,13 @@ export function ProductoModal({
     startTransition(async () => {
       if (editTarget) {
         const res = await updateProducto(editTarget.id, data);
-        if (res.error) { sileo.error({ title: res.error }); return; }
-        sileo.success({ title: "Producto actualizado" });
+        if (res.error) { sileo.error({ title: res.error, description: "Por favor intenta nuevamente." }); return; }
+        sileo.success({ title: "Producto actualizado", description: "Los cambios se guardaron correctamente." });
         onSuccess(res.data!);
       } else {
         const res = await createProducto(data);
-        if (res.error) { sileo.error({ title: res.error }); return; }
-        sileo.success({ title: "Producto creado" });
+        if (res.error) { sileo.error({ title: res.error, description: "Por favor intenta nuevamente." }); return; }
+        sileo.success({ title: "Producto creado", description: "El producto se agregó al inventario." });
         onSuccess(res.data!);
       }
       onClose();
