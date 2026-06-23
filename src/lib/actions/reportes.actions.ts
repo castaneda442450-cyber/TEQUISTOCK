@@ -66,6 +66,41 @@ export interface MovimientosResult {
   rows: MovimientoReporteRow[];
 }
 
+// ─── Types: Stock Actual ──────────────────────────────────────────────────────
+
+export type EstadoStock = "normal" | "bajo" | "critico";
+
+export interface StockActualProductoRow {
+  product_id: string;
+  nombre: string;
+  categoria: string;
+  unidad: string;
+  stock_actual: number;
+  stock_minimo: number;
+  last_price: number;
+  valor_inventario: number;
+  estado: EstadoStock;
+}
+
+export interface StockActualResumen {
+  total_productos: number;
+  productos_criticos: number;
+  productos_bajos: number;
+  productos_normales: number;
+  valor_total_inventario: number;
+  valor_criticos: number;
+  generado_en: string;
+}
+
+export interface StockActualResult {
+  resumen: StockActualResumen;
+  productos: StockActualProductoRow[];
+  filtros_aplicados: {
+    categoria: string | null;
+    estado: EstadoStock | null;
+  };
+}
+
 // ─── Action 1: Gastos por Producto ───────────────────────────────────────────
 
 export async function getGastosPorProducto(
@@ -340,6 +375,107 @@ export interface ResumenSemanalResult {
   resumen_general: ResumenGeneralSemanal;
   por_producto: ResumenSemanalProductoRow[];
   alertas: string[];
+}
+
+// ─── Action 6: Stock Actual ───────────────────────────────────────────────────
+
+export async function getReporteStockActual(
+  categoriaId: string | null,
+  estado: EstadoStock | null,
+): Promise<{ data: StockActualResult | null; error: string | null }> {
+  const auth = await requireAuth();
+  if (auth.error) return { data: null, error: auth.error };
+  const supabase = await sb();
+
+  let query = supabase
+    .from("productos")
+    .select("id, nombre, unidad, stock_actual, stock_minimo, last_price, categorias:categoria_id(id, nombre)")
+    .order("nombre", { ascending: true });
+
+  if (categoriaId !== null) {
+    query = query.eq("categoria_id", categoriaId);
+  }
+
+  const { data: productos, error } = await query;
+  if (error) return { data: null, error: error.message };
+
+  const rawProductos = (productos ?? []) as any[];
+
+  // Calcular estado y valor_inventario en JS
+  let rows: StockActualProductoRow[] = rawProductos.map((p) => {
+    const stockActual = Number(p.stock_actual ?? 0);
+    const stockMinimo = Number(p.stock_minimo ?? 0);
+    const lastPrice = Number(p.last_price ?? 0);
+    const valorInventario = stockActual * lastPrice;
+
+    let estadoCalc: EstadoStock;
+    if (stockActual < stockMinimo) {
+      estadoCalc = "critico";
+    } else if (stockActual < stockMinimo * 1.5) {
+      estadoCalc = "bajo";
+    } else {
+      estadoCalc = "normal";
+    }
+
+    return {
+      product_id: p.id as string,
+      nombre: p.nombre as string,
+      categoria: (p.categorias as any)?.nombre ?? "Sin categoría",
+      unidad: p.unidad as string,
+      stock_actual: stockActual,
+      stock_minimo: stockMinimo,
+      last_price: lastPrice,
+      valor_inventario: valorInventario,
+      estado: estadoCalc,
+    };
+  });
+
+  // Filtrar por estado si se especificó
+  if (estado !== null) {
+    rows = rows.filter((r) => r.estado === estado);
+  }
+
+  // Ordenar: categoría asc, nombre asc
+  rows.sort((a, b) => {
+    const catCmp = a.categoria.localeCompare(b.categoria);
+    return catCmp !== 0 ? catCmp : a.nombre.localeCompare(b.nombre);
+  });
+
+  // Calcular resumen desde el array ya filtrado
+  const total_productos = rows.length;
+  const productos_criticos = rows.filter((r) => r.estado === "critico").length;
+  const productos_bajos = rows.filter((r) => r.estado === "bajo").length;
+  const productos_normales = rows.filter((r) => r.estado === "normal").length;
+  const valor_total_inventario = rows.reduce((s, r) => s + r.valor_inventario, 0);
+  const valor_criticos = rows
+    .filter((r) => r.estado === "critico")
+    .reduce((s, r) => s + r.valor_inventario, 0);
+
+  // Obtener nombre de categoría para filtros_aplicados
+  let categoriaName: string | null = null;
+  if (categoriaId !== null && rawProductos.length > 0) {
+    categoriaName = (rawProductos[0].categorias as any)?.nombre ?? null;
+  }
+
+  return {
+    data: {
+      resumen: {
+        total_productos,
+        productos_criticos,
+        productos_bajos,
+        productos_normales,
+        valor_total_inventario,
+        valor_criticos,
+        generado_en: new Date().toISOString(),
+      },
+      productos: rows,
+      filtros_aplicados: {
+        categoria: categoriaName,
+        estado,
+      },
+    },
+    error: null,
+  };
 }
 
 // ─── Action 4: Movimientos de Inventario ─────────────────────────────────────

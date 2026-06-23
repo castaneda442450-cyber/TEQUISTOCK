@@ -14,6 +14,7 @@ import {
   getMermaAnalisis,
   getMovimientosReporte,
   getReporteSemanal,
+  getReporteStockActual,
 } from "@/lib/actions/reportes.actions";
 import type {
   GastoProductoResult,
@@ -21,16 +22,20 @@ import type {
   MermaResult,
   MovimientosResult,
   ResumenSemanalResult,
+  StockActualResult,
+  EstadoStock,
 } from "@/lib/actions/reportes.actions";
+import { createClient } from "@/lib/supabase/client";
 
-export type ReportType = "gastos_producto" | "gastos_proveedor" | "merma" | "movimientos" | "resumen_semanal";
+export type ReportType = "gastos_producto" | "gastos_proveedor" | "merma" | "movimientos" | "resumen_semanal" | "stock_actual";
 
 type ReportData =
   | { type: "gastos_producto"; result: GastoProductoResult }
   | { type: "gastos_proveedor"; result: GastoProveedorResult }
   | { type: "merma"; result: MermaResult }
   | { type: "movimientos"; result: MovimientosResult }
-  | { type: "resumen_semanal"; result: ResumenSemanalResult };
+  | { type: "resumen_semanal"; result: ResumenSemanalResult }
+  | { type: "stock_actual"; result: StockActualResult };
 
 const REPORT_NAMES: Record<ReportType, string> = {
   gastos_producto: "Gastos por Producto",
@@ -38,6 +43,7 @@ const REPORT_NAMES: Record<ReportType, string> = {
   merma: "Análisis de Merma",
   movimientos: "Movimientos de Inventario",
   resumen_semanal: "Resumen Semanal — Cierres de Turno",
+  stock_actual: "Stock Actual — Inventario Completo",
 };
 
 const TIPO_COLORS: Record<string, { bg: string; fg: string; label: string }> = {
@@ -80,6 +86,7 @@ function buildFilename(type: ReportType, desde: string, hasta: string, ext: "pdf
     merma: "merma",
     movimientos: "movimientos",
     resumen_semanal: "resumen-semanal",
+    stock_actual: "stock-actual",
   }[type];
   const periodo = desde && hasta ? `${desde}_${hasta}` : "todo";
   return `tequistock-${tipo}-${periodo}-${today()}.${ext}`;
@@ -557,9 +564,130 @@ function ResumenSemanalPreview({ result }: { result: ResumenSemanalResult }) {
   );
 }
 
+// ─── Stock Actual Preview ─────────────────────────────────────────────────────
+
+const ESTADO_STYLES: Record<EstadoStock, { bg: string; fg: string; label: string }> = {
+  critico: { bg: "#FCEBEB", fg: "#791F1F", label: "Crítico" },
+  bajo: { bg: "#FAEEDA", fg: "#633806", label: "Bajo" },
+  normal: { bg: "#EAF3DE", fg: "#27500A", label: "Normal" },
+};
+
+function StockActualPreview({ result }: { result: StockActualResult }) {
+  const { resumen, productos, filtros_aplicados } = result;
+
+  const metricCards = [
+    { label: "Total productos", value: String(resumen.total_productos), color: "#0B4455" },
+    { label: "Valor total", value: formatCurrency(resumen.valor_total_inventario), color: "#106653" },
+    { label: "Productos críticos", value: String(resumen.productos_criticos), color: resumen.productos_criticos > 0 ? "#BA3026" : "#0B4455" },
+    { label: "Productos bajos", value: String(resumen.productos_bajos), color: resumen.productos_bajos > 0 ? "#C2972E" : "#0B4455" },
+  ];
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      {/* Métricas 2×2 */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
+        {metricCards.map((m) => (
+          <div
+            key={m.label}
+            style={{
+              background: "hsl(var(--surface-alt))",
+              borderRadius: 8,
+              padding: "14px 18px",
+              display: "flex",
+              flexDirection: "column",
+              gap: 4,
+            }}
+          >
+            <span style={{ fontSize: 11, fontWeight: 600, color: "hsl(var(--text-sub))", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+              {m.label}
+            </span>
+            <span style={{ fontSize: 20, fontWeight: 800, color: m.color, fontVariantNumeric: "tabular-nums" }}>
+              {m.value}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* Filtros aplicados */}
+      {(filtros_aplicados.categoria || filtros_aplicados.estado) && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 12, color: "hsl(var(--text-muted))" }}>Mostrando:</span>
+          {filtros_aplicados.categoria && (
+            <span style={{ background: "#0B445518", color: "#0B4455", borderRadius: 99, fontSize: 11, fontWeight: 600, padding: "2px 10px" }}>
+              Categoría: {filtros_aplicados.categoria}
+            </span>
+          )}
+          {filtros_aplicados.estado && (
+            <span style={{ background: ESTADO_STYLES[filtros_aplicados.estado].bg, color: ESTADO_STYLES[filtros_aplicados.estado].fg, borderRadius: 99, fontSize: 11, fontWeight: 600, padding: "2px 10px" }}>
+              Estado: {ESTADO_STYLES[filtros_aplicados.estado].label}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Tabla de productos */}
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead>
+            <tr>
+              <th style={thStyle}>Producto</th>
+              <th style={thStyle}>Categoría</th>
+              <th style={{ ...thStyle, textAlign: "center" }}>Stock actual</th>
+              <th style={{ ...thStyle, textAlign: "center" }}>Mínimo</th>
+              <th style={{ ...thStyle, textAlign: "right" }}>Precio unit.</th>
+              <th style={{ ...thStyle, textAlign: "right" }}>Valor</th>
+              <th style={{ ...thStyle, textAlign: "center" }}>Estado</th>
+            </tr>
+          </thead>
+          <tbody>
+            {productos.length === 0 ? (
+              <tr>
+                <td colSpan={7} style={{ ...tdStyle(0), textAlign: "center", color: "hsl(var(--text-muted))", padding: "32px" }}>
+                  Sin productos para los filtros seleccionados
+                </td>
+              </tr>
+            ) : (
+              productos.map((p, ri) => {
+                const es = ESTADO_STYLES[p.estado];
+                const rowBg = p.estado === "critico" ? "#fff8f8" : p.estado === "bajo" ? "#fffbf0" : undefined;
+                return (
+                  <tr key={p.product_id}>
+                    <td style={{ ...tdStyle(ri), background: rowBg ?? tdStyle(ri).background, fontWeight: 600 }}>{p.nombre}</td>
+                    <td style={{ ...tdStyle(ri), background: rowBg ?? tdStyle(ri).background, fontSize: 12, color: "hsl(var(--text-sub))" }}>{p.categoria}</td>
+                    <td style={{ ...tdStyle(ri, "center"), background: rowBg ?? tdStyle(ri).background, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{p.stock_actual}</td>
+                    <td style={{ ...tdStyle(ri, "center"), background: rowBg ?? tdStyle(ri).background, fontVariantNumeric: "tabular-nums" }}>{p.stock_minimo}</td>
+                    <td style={{ ...tdStyle(ri, "right"), background: rowBg ?? tdStyle(ri).background, fontVariantNumeric: "tabular-nums" }}>{formatCurrency(p.last_price)}</td>
+                    <td style={{ ...tdStyle(ri, "right"), background: rowBg ?? tdStyle(ri).background, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{formatCurrency(p.valor_inventario)}</td>
+                    <td style={{ ...tdStyle(ri, "center"), background: rowBg ?? tdStyle(ri).background }}>
+                      <span style={{ background: es.bg, color: es.fg, borderRadius: 99, fontSize: 11, fontWeight: 600, padding: "2px 10px" }}>
+                        {es.label}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+      <GrandTotal label="Valor total del inventario" value={resumen.valor_total_inventario} color="#0B4455" />
+    </div>
+  );
+}
+
 // ─── Build Excel rows ─────────────────────────────────────────────────────────
 
 function buildSheetRows(data: ReportData): (string | number)[][] {
+  if (data.type === "stock_actual") {
+    const header = ["Producto", "Categoría", "Unidad", "Stock actual", "Stock mínimo", "Precio unit.", "Valor inventario", "Estado"];
+    const rows = data.result.productos.map((p) => [
+      p.nombre, p.categoria, p.unidad,
+      p.stock_actual, p.stock_minimo, p.last_price, p.valor_inventario,
+      p.estado === "critico" ? "Crítico" : p.estado === "bajo" ? "Bajo" : "Normal",
+    ]);
+    const totales = ["TOTAL", "", "", "", "", "", data.result.resumen.valor_total_inventario, ""];
+    return [header, ...rows, totales];
+  }
   if (data.type === "gastos_producto") {
     const header = ["Producto", "Categoría", "Cant. Comprada", "Veces Comprado", "Gasto Total (MXN)", "Promedio/Compra (MXN)"];
     const rows = data.result.rows.map((r) => [
@@ -626,6 +754,11 @@ export function ReportModal({ type, onClose }: ReportModalProps) {
   const [isPending, startTransition] = useTransition();
   const overlayRef = useRef<HTMLDivElement>(null);
 
+  // Stock Actual filters
+  const [categoriaFiltro, setCategoriaFiltro] = useState<string>("");
+  const [estadoFiltro, setEstadoFiltro] = useState<EstadoStock | "">("");
+  const [categorias, setCategorias] = useState<{ id: string; nombre: string }[]>([]);
+
   useEffect(() => {
     overlayRef.current?.focus();
   }, []);
@@ -636,6 +769,25 @@ export function ReportModal({ type, onClose }: ReportModalProps) {
       setHasta(semanas[selectedSemana].hasta);
     }
   }, [selectedSemana, type, semanas]);
+
+  // Resetear filtros de stock_actual al cambiar tipo
+  useEffect(() => {
+    setCategoriaFiltro("");
+    setEstadoFiltro("");
+  }, [type]);
+
+  // Cargar categorías para el filtro de stock_actual
+  useEffect(() => {
+    if (type !== "stock_actual") return;
+    const supabase = createClient();
+    supabase
+      .from("categorias")
+      .select("id, nombre")
+      .order("nombre")
+      .then(({ data: cats }) => {
+        if (cats) setCategorias(cats);
+      });
+  }, [type]);
 
   function handleGenerar() {
     startTransition(async () => {
@@ -649,6 +801,11 @@ export function ReportModal({ type, onClose }: ReportModalProps) {
         res = await getMermaAnalisis(desde, hasta);
       } else if (type === "resumen_semanal") {
         res = await getReporteSemanal(desde, hasta);
+      } else if (type === "stock_actual") {
+        res = await getReporteStockActual(
+          categoriaFiltro || null,
+          (estadoFiltro as EstadoStock) || null,
+        );
       } else {
         res = await getMovimientosReporte(desde, hasta);
       }
@@ -668,14 +825,16 @@ export function ReportModal({ type, onClose }: ReportModalProps) {
     try {
       const { pdf } = await import("@react-pdf/renderer");
       const { ReportPDF } = await import("@/components/reportes/ReportPDF");
+      const pdfDesde = type === "stock_actual" ? "" : desde;
+      const pdfHasta = type === "stock_actual" ? "" : hasta;
       // @react-pdf/renderer pdf() expects DocumentProps but our component wraps Document internally
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const element = React.createElement(ReportPDF, { reportData: data, desde, hasta }) as any;
+      const element = React.createElement(ReportPDF, { reportData: data, desde: pdfDesde, hasta: pdfHasta }) as any;
       const blob = await pdf(element).toBlob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = buildFilename(type, desde, hasta, "pdf");
+      a.download = buildFilename(type, pdfDesde, pdfHasta, "pdf");
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
@@ -698,7 +857,9 @@ export function ReportModal({ type, onClose }: ReportModalProps) {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = buildFilename(type, desde, hasta, "xlsx");
+      const xlsxDesde = type === "stock_actual" ? "" : desde;
+      const xlsxHasta = type === "stock_actual" ? "" : hasta;
+      a.download = buildFilename(type, xlsxDesde, xlsxHasta, "xlsx");
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
@@ -769,7 +930,7 @@ export function ReportModal({ type, onClose }: ReportModalProps) {
               <h2 style={{ fontSize: 18, fontWeight: 700, color: "hsl(var(--text-main))", margin: 0 }}>
                 {REPORT_NAMES[type]}
               </h2>
-              {hasGenerated && desde && hasta && (
+              {hasGenerated && desde && hasta && type !== "stock_actual" && (
                 <p style={{ fontSize: 12, color: "hsl(var(--text-muted))", margin: "2px 0 0" }}>
                   {formatDate(desde)} – {formatDate(hasta)}
                 </p>
@@ -808,7 +969,7 @@ export function ReportModal({ type, onClose }: ReportModalProps) {
             }}
           >
             <span style={{ fontSize: 12, fontWeight: 600, color: "hsl(var(--text-sub))" }}>
-              {type === "resumen_semanal" ? "Semana:" : "Período:"}
+              {type === "resumen_semanal" ? "Semana:" : type === "stock_actual" ? "Filtros:" : "Período:"}
             </span>
             {type === "resumen_semanal" ? (
               <select
@@ -829,6 +990,47 @@ export function ReportModal({ type, onClose }: ReportModalProps) {
                   <option key={i} value={i}>{s.label}</option>
                 ))}
               </select>
+            ) : type === "stock_actual" ? (
+              <>
+                <select
+                  value={categoriaFiltro}
+                  onChange={(e) => setCategoriaFiltro(e.target.value)}
+                  style={{
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: 8,
+                    padding: "7px 10px",
+                    fontSize: 13,
+                    background: "hsl(var(--surface))",
+                    color: "hsl(var(--text-main))",
+                    outline: "none",
+                    cursor: "pointer",
+                  }}
+                >
+                  <option value="">Todas las categorías</option>
+                  {categorias.map((c) => (
+                    <option key={c.id} value={c.id}>{c.nombre}</option>
+                  ))}
+                </select>
+                <select
+                  value={estadoFiltro}
+                  onChange={(e) => setEstadoFiltro(e.target.value as EstadoStock | "")}
+                  style={{
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: 8,
+                    padding: "7px 10px",
+                    fontSize: 13,
+                    background: "hsl(var(--surface))",
+                    color: "hsl(var(--text-main))",
+                    outline: "none",
+                    cursor: "pointer",
+                  }}
+                >
+                  <option value="">Todos</option>
+                  <option value="normal">Normal</option>
+                  <option value="bajo">Bajo</option>
+                  <option value="critico">Crítico</option>
+                </select>
+              </>
             ) : (
               <>
                 <input
@@ -909,6 +1111,8 @@ export function ReportModal({ type, onClose }: ReportModalProps) {
               <MovimientosTable result={data.result} />
             ) : data?.type === "resumen_semanal" ? (
               <ResumenSemanalPreview result={data.result} />
+            ) : data?.type === "stock_actual" ? (
+              <StockActualPreview result={data.result} />
             ) : null}
           </div>
 

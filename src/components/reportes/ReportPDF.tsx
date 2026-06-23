@@ -11,16 +11,19 @@ import type {
   MermaResult,
   MovimientosResult,
   ResumenSemanalResult,
+  StockActualResult,
+  EstadoStock,
 } from "@/lib/actions/reportes.actions";
 
-export type ReportType = "gastos_producto" | "gastos_proveedor" | "merma" | "movimientos" | "resumen_semanal";
+export type ReportType = "gastos_producto" | "gastos_proveedor" | "merma" | "movimientos" | "resumen_semanal" | "stock_actual";
 
 export type ReportData =
   | { type: "gastos_producto"; result: GastoProductoResult }
   | { type: "gastos_proveedor"; result: GastoProveedorResult }
   | { type: "merma"; result: MermaResult }
   | { type: "movimientos"; result: MovimientosResult }
-  | { type: "resumen_semanal"; result: ResumenSemanalResult };
+  | { type: "resumen_semanal"; result: ResumenSemanalResult }
+  | { type: "stock_actual"; result: StockActualResult };
 
 export interface ReportPDFProps {
   reportData: ReportData;
@@ -34,6 +37,7 @@ const REPORT_NAMES: Record<ReportType, string> = {
   merma: "Análisis de Merma",
   movimientos: "Movimientos de Inventario",
   resumen_semanal: "Resumen Semanal de Inventario",
+  stock_actual: "Reporte de Stock Actual",
 };
 
 const s = StyleSheet.create({
@@ -374,6 +378,100 @@ function ResumenSemanalPDF({ result }: { result: ResumenSemanalResult }) {
   );
 }
 
+// ─── Stock Actual PDF ─────────────────────────────────────────────────────────
+
+const ESTADO_LABELS_PDF: Record<EstadoStock, string> = { critico: "Crítico", bajo: "Bajo", normal: "Normal" };
+const ESTADO_COLORS_PDF: Record<EstadoStock, string> = { critico: "#BA3026", bajo: "#C2972E", normal: "#106653" };
+
+function StockActualPDF({ result }: { result: StockActualResult }) {
+  const { resumen, productos, filtros_aplicados } = result;
+  const cols = [150, 80, 45, 45, 45, 65, 70, 55];
+
+  return (
+    <View>
+      {/* Sección 1 — Métricas 2×2 */}
+      <Text style={s.sectionTitle}>RESUMEN</Text>
+      <View style={s.metricRow}>
+        <View style={s.metricCard}>
+          <Text style={s.metricLabel}>TOTAL PRODUCTOS</Text>
+          <Text style={s.metricValue}>{String(resumen.total_productos)}</Text>
+        </View>
+        <View style={s.metricCard}>
+          <Text style={s.metricLabel}>VALOR TOTAL</Text>
+          <Text style={[s.metricValue, { color: "#106653" }]}>{formatCurrency(resumen.valor_total_inventario)}</Text>
+        </View>
+      </View>
+      <View style={[s.metricRow, { marginBottom: 14 }]}>
+        <View style={s.metricCard}>
+          <Text style={s.metricLabel}>PRODUCTOS CRÍTICOS</Text>
+          <Text style={[s.metricValue, { color: resumen.productos_criticos > 0 ? "#BA3026" : "#0B4455" }]}>
+            {String(resumen.productos_criticos)}
+          </Text>
+        </View>
+        <View style={s.metricCard}>
+          <Text style={s.metricLabel}>PRODUCTOS BAJOS</Text>
+          <Text style={[s.metricValue, { color: resumen.productos_bajos > 0 ? "#C2972E" : "#0B4455" }]}>
+            {String(resumen.productos_bajos)}
+          </Text>
+        </View>
+      </View>
+
+      {/* Sección 2 — Filtros aplicados */}
+      {(filtros_aplicados.categoria || filtros_aplicados.estado) && (
+        <Text style={[s.meta, { marginBottom: 8 }]}>
+          {"Filtros: "}
+          {filtros_aplicados.categoria ? "Categoría: " + filtros_aplicados.categoria : ""}
+          {filtros_aplicados.categoria && filtros_aplicados.estado ? " | " : ""}
+          {filtros_aplicados.estado ? "Estado: " + ESTADO_LABELS_PDF[filtros_aplicados.estado] : ""}
+        </Text>
+      )}
+
+      {/* Sección 3 — Tabla de productos */}
+      <Text style={s.sectionTitle}>DETALLE DE INVENTARIO</Text>
+      <View style={s.tableHead}>
+        <Text style={[s.thText, { width: cols[0] }]}>PRODUCTO</Text>
+        <Text style={[s.thText, { width: cols[1] }]}>CATEGORÍA</Text>
+        <Text style={[s.thText, { width: cols[2], textAlign: "center" }]}>UND.</Text>
+        <Text style={[s.thText, { width: cols[3], textAlign: "center" }]}>STOCK</Text>
+        <Text style={[s.thText, { width: cols[4], textAlign: "center" }]}>MÍN.</Text>
+        <Text style={[s.thText, { width: cols[5], textAlign: "right" }]}>PRECIO</Text>
+        <Text style={[s.thText, { width: cols[6], textAlign: "right" }]}>VALOR</Text>
+        <Text style={[s.thText, { width: cols[7], textAlign: "center" }]}>ESTADO</Text>
+      </View>
+      {productos.map((p, i) => {
+        const rowBg = p.estado === "critico" ? "#FCEBEB" : p.estado === "bajo" ? "#FAEEDA" : undefined;
+        const rowStyle = [s.row, i % 2 === 0 ? s.rowEven : s.rowOdd, rowBg ? { backgroundColor: rowBg } : {}];
+        return (
+          <View key={p.product_id} style={rowStyle}>
+            <Text style={[s.cell, { width: cols[0] }]}>{p.nombre}</Text>
+            <Text style={[s.cellMuted, { width: cols[1] }]}>{p.categoria}</Text>
+            <Text style={[s.cellCenter, { width: cols[2] }]}>{p.unidad}</Text>
+            <Text style={[s.cellCenter, { width: cols[3], fontFamily: "Helvetica-Bold" }]}>{String(p.stock_actual)}</Text>
+            <Text style={[s.cellCenter, { width: cols[4] }]}>{String(p.stock_minimo)}</Text>
+            <Text style={[s.cellRight, { width: cols[5] }]}>{formatCurrency(p.last_price)}</Text>
+            <Text style={[s.cellBold, { width: cols[6] }]}>{formatCurrency(p.valor_inventario)}</Text>
+            <Text style={[s.cellCenter, { width: cols[7], fontFamily: "Helvetica-Bold", color: ESTADO_COLORS_PDF[p.estado] }]}>
+              {ESTADO_LABELS_PDF[p.estado]}
+            </Text>
+          </View>
+        );
+      })}
+
+      {/* Sección 4 — Resumen financiero */}
+      <View style={s.totalsRow}>
+        <Text style={s.totalsLabel}>VALOR TOTAL DEL INVENTARIO</Text>
+        <Text style={s.totalsValue}>{formatCurrency(resumen.valor_total_inventario)}</Text>
+      </View>
+      {resumen.productos_criticos > 0 && (
+        <View style={[s.totalsRow, { marginTop: 4, backgroundColor: "#FCEBEB" }]}>
+          <Text style={[s.totalsLabel, { color: "#BA3026" }]}>VALOR EN RIESGO (STOCK CRÍTICO)</Text>
+          <Text style={[s.totalsValue, { color: "#BA3026" }]}>{formatCurrency(resumen.valor_criticos)}</Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
 export function ReportPDF({ reportData, desde, hasta }: ReportPDFProps) {
   return (
     <Document>
@@ -390,6 +488,9 @@ export function ReportPDF({ reportData, desde, hasta }: ReportPDFProps) {
         {reportData.type === "movimientos" && <MovimientosTable result={reportData.result} />}
         {reportData.type === "resumen_semanal" && (
           <ResumenSemanalPDF result={reportData.result} />
+        )}
+        {reportData.type === "stock_actual" && (
+          <StockActualPDF result={reportData.result} />
         )}
         <PDFFooter />
       </Page>
