@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useTransition } from "react";
+import { useIsTablet } from "@/hooks/useIsTablet";
 import { sileo } from "sileo";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -73,6 +74,7 @@ export default function TurnoClient({ productos }: Props) {
   const [modalExito, setModalExito] = useState(false);
   const [resumen, setResumen] = useState<CierreTurnoResumen | null>(null);
   const [isPending, startTransition] = useTransition();
+  const isTablet = useIsTablet();
 
   const now = new Date();
   const turnoLabel = getTurnoLabel(now.getHours());
@@ -207,7 +209,7 @@ export default function TurnoClient({ productos }: Props) {
 
   // ───────── RENDER ─────────
   return (
-    <div style={{ padding: "28px 32px", maxWidth: 1100, margin: "0 auto" }}>
+    <div className="tablet-page-content" style={{ padding: "28px 32px", maxWidth: 1100, margin: "0 auto" }}>
 
       {/* ── Header ── */}
       <div style={{ marginBottom: 24 }}>
@@ -544,7 +546,7 @@ export default function TurnoClient({ productos }: Props) {
               backgroundColor: "hsl(var(--surface))",
               borderRadius: 12,
               boxShadow: "0 32px 80px rgba(0,0,0,0.28)",
-              maxWidth: 520,
+              maxWidth: isTablet ? "calc(100% - 24px)" : 520,
               width: "100%",
               animation: "modalIn 0.18s ease-out",
               overflow: "hidden",
@@ -627,7 +629,7 @@ export default function TurnoClient({ productos }: Props) {
               backgroundColor: "hsl(var(--surface))",
               borderRadius: 12,
               boxShadow: "0 32px 80px rgba(0,0,0,0.28)",
-              maxWidth: 440,
+              maxWidth: isTablet ? "calc(100% - 24px)" : 440,
               width: "100%",
               animation: "modalIn 0.18s ease-out",
               padding: "32px 28px 24px",

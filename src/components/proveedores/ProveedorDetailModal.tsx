@@ -98,6 +98,7 @@ export function ProveedorDetailModal({
             )}
           </div>
           <button
+            data-icon-btn
             onClick={onClose}
             style={{
               padding: 6,

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useTransition } from "react";
+import { useIsTablet } from "@/hooks/useIsTablet";
 import { Info, ChevronDown, ChevronRight, Plus, Minus, X, Pencil, Trash2, ChefHat } from "lucide-react";
 import { sileo } from "sileo";
 import { ProductoSearchSelect } from "@/components/ui/ProductoSearchSelect";
@@ -36,6 +37,7 @@ function NuevoPlatilloModal({
   const [lines, setLines] = useState<LineItem[]>([{ producto_id: "", qty_por_porcion: 1 }]);
   const [formError, setFormError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const isTablet = useIsTablet();
 
   const addLine = () =>
     setLines((prev) => [...prev, { producto_id: "", qty_por_porcion: 1 }]);
@@ -109,7 +111,7 @@ function NuevoPlatilloModal({
           borderRadius: 12,
           boxShadow: "0 32px 80px rgba(0,0,0,0.28)",
           width: "100%",
-          maxWidth: 560,
+          maxWidth: isTablet ? "calc(100% - 24px)" : 560,
           maxHeight: "90vh",
           display: "flex",
           flexDirection: "column",
@@ -135,6 +137,7 @@ function NuevoPlatilloModal({
             </p>
           </div>
           <button
+            data-icon-btn
             onClick={onClose}
             style={{
               background: "none",
@@ -302,6 +305,7 @@ function NuevoPlatilloModal({
                   />
 
                   <button
+                    data-icon-btn
                     type="button"
                     onClick={() => removeLine(i)}
                     disabled={lines.length === 1}
@@ -592,6 +596,7 @@ function IngredienteRow({
       >
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
           <button
+            data-icon-btn
             onClick={() => setEditRow({ id: ficha.id, qty: String(ficha.qty_por_porcion) })}
             title="Editar cantidad"
             style={{
@@ -610,6 +615,7 @@ function IngredienteRow({
             <Pencil size={13} />
           </button>
           <button
+            data-icon-btn
             onClick={handleDelete}
             title="Eliminar ingrediente"
             style={{
@@ -799,6 +805,7 @@ function PlatilloCard({
 
             {/* Eliminar platillo */}
             <button
+              data-icon-btn
               onClick={() => setDeleteTarget(nombre)}
               title="Eliminar platillo"
               style={{
@@ -886,7 +893,7 @@ export function FichasClient({ fichas, productos }: Props) {
   };
 
   return (
-    <div style={{ padding: "28px 32px", maxWidth: 900, margin: "0 auto" }}>
+    <div className="tablet-page-content" style={{ padding: "28px 32px", maxWidth: 900, margin: "0 auto" }}>
       {/* Título de página */}
       <div
         style={{
@@ -979,6 +986,7 @@ export function FichasClient({ fichas, productos }: Props) {
             <strong>Modo configuración:</strong> Las fichas técnicas se activarán automáticamente cuando se conecte Clover POS. Por ahora puedes cargar las recetas sin que afecten el inventario.
           </p>
           <button
+            data-icon-btn
             onClick={() => setBannerVisible(false)}
             aria-label="Cerrar aviso"
             style={{

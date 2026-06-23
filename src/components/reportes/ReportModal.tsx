@@ -937,6 +937,7 @@ export function ReportModal({ type, onClose }: ReportModalProps) {
               )}
             </div>
             <button
+              data-icon-btn
               onClick={onClose}
               style={{
                 background: "none",

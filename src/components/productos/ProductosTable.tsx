@@ -245,9 +245,11 @@ export function ProductosTable({ productos, categorias, onEdit, onDelete, onFrec
           >
             {hg.headers.map((h) => {
               const align = (h.column.columnDef.meta as { align?: "left" | "center" | "right" } | undefined)?.align ?? "left";
+              const hideOnTablet = ["categoria", "precio"].includes(h.column.id);
               return (
                 <th
                   key={h.id}
+                  className={hideOnTablet ? "tablet-col-hide" : undefined}
                   style={{
                     padding: "12px 16px",
                     textAlign: align,
@@ -285,9 +287,11 @@ export function ProductosTable({ productos, categorias, onEdit, onDelete, onFrec
           >
             {row.getVisibleCells().map((cell) => {
               const align = (cell.column.columnDef.meta as { align?: "left" | "center" | "right" } | undefined)?.align ?? "left";
+              const hideOnTablet = ["categoria", "precio"].includes(cell.column.id);
               return (
                 <td
                   key={cell.id}
+                  className={hideOnTablet ? "tablet-col-hide" : undefined}
                   style={{
                     padding: "14px 16px",
                     textAlign: align,
@@ -321,6 +325,7 @@ function ActionBtn({
   const bgHover = `hsl(var(--${varName}) / 0.22)`;
   return (
     <button
+      data-icon-btn
       onClick={onClick}
       title={title}
       style={{

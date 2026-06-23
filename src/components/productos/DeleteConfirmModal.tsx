@@ -51,6 +51,7 @@ export function DeleteConfirmModal({ producto, onConfirm, onCancel }: DeleteConf
             </h2>
           </div>
           <button
+            data-icon-btn
             onClick={onCancel}
             style={{
               padding: 6, borderRadius: 6, border: "none",

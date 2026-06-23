@@ -164,6 +164,7 @@ export function CategoriaModal({ open, categorias, onClose, onCreated, onDeleted
             </h2>
           </div>
           <button
+            data-icon-btn
             onClick={handleClose}
             style={{
               padding: 6, borderRadius: 6, border: "none",

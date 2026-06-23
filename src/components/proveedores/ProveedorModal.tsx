@@ -138,6 +138,7 @@ export function ProveedorModal({
             {editTarget ? `Editar: ${editTarget.company}` : "Nuevo Proveedor"}
           </h2>
           <button
+            data-icon-btn
             onClick={onClose}
             style={{
               padding: 6,

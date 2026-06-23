@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useIsTablet } from "@/hooks/useIsTablet";
 import { sileo } from "sileo";
 import { LogOut, Trash2, Plus } from "lucide-react";
 import { anularMovimiento } from "@/lib/actions/salidas.actions";
@@ -21,6 +22,7 @@ type Tab = "consumo" | "merma";
 
 
 export default function SalidasClient({ movimientos: initial, productos }: Props) {
+  const isTablet = useIsTablet();
   const [movimientos, setMovimientos] = useState(initial);
   const [tab, setTab] = useState<Tab>("consumo");
   const [modal, setModal] = useState<"consumo" | "merma" | null>(null);
@@ -61,7 +63,7 @@ export default function SalidasClient({ movimientos: initial, productos }: Props
   }
 
   return (
-    <div style={{ padding: 28 }}>
+    <div className="tablet-page-content" style={{ padding: 28 }}>
       {/* Page header */}
       <div style={{ marginBottom: 22 }}>
         <h1 style={{ fontSize: 20, fontWeight: 700, color: "hsl(var(--text-main))", margin: 0 }}>
@@ -154,7 +156,7 @@ export default function SalidasClient({ movimientos: initial, productos }: Props
                 <thead>
                   <tr style={{ backgroundColor: "hsl(var(--surface-alt))" }}>
                     {["Fecha", "Producto", "Cantidad", "Valor", "Notas", ""].map((h) => (
-                      <th key={h} style={{ ...thStyle, textAlign: (h === "Cantidad" || h === "Valor") ? "center" : "left" }}>{h}</th>
+                      <th key={h} className={h === "Valor" ? "tablet-col-hide" : undefined} style={{ ...thStyle, textAlign: (h === "Cantidad" || h === "Valor") ? "center" : "left" }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -185,7 +187,7 @@ export default function SalidasClient({ movimientos: initial, productos }: Props
                           {" "}
                           <span style={{ fontSize: 11, color: "hsl(var(--text-muted))" }}>{prod?.unidad}</span>
                         </td>
-                        <td style={{ padding: "11px 14px", textAlign: "center" }}>
+                        <td className="tablet-col-hide" style={{ padding: "11px 14px", textAlign: "center" }}>
                           <span style={{ fontWeight: 700, color: "hsl(var(--navy))", fontVariantNumeric: "tabular-nums" }}>
                             {formatCurrency(valor)}
                           </span>
@@ -198,6 +200,7 @@ export default function SalidasClient({ movimientos: initial, productos }: Props
                         </td>
                         <td style={{ padding: "11px 14px" }}>
                           <button
+                            data-icon-btn
                             onClick={() => confirmDelete(m)}
                             style={{
                               display: "flex", alignItems: "center", justifyContent: "center",
@@ -214,7 +217,7 @@ export default function SalidasClient({ movimientos: initial, productos }: Props
                   })}
                   {consumos.length === 0 && (
                     <tr>
-                      <td colSpan={6} style={{ padding: 48, textAlign: "center", color: "hsl(var(--text-muted))", fontSize: 14 }}>
+                      <td colSpan={isTablet ? 5 : 6} style={{ padding: 48, textAlign: "center", color: "hsl(var(--text-muted))", fontSize: 14 }}>
                         Sin consumos registrados
                       </td>
                     </tr>
@@ -267,7 +270,7 @@ export default function SalidasClient({ movimientos: initial, productos }: Props
                 <thead>
                   <tr style={{ backgroundColor: "hsl(var(--surface-alt))" }}>
                     {["Fecha", "Producto", "Cantidad", "Tipo", "Valor Perdido", "Motivo", ""].map((h) => (
-                      <th key={h} style={thStyle}>{h}</th>
+                      <th key={h} className={h === "Motivo" ? "tablet-col-hide" : undefined} style={thStyle}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -305,7 +308,7 @@ export default function SalidasClient({ movimientos: initial, productos }: Props
                             {formatCurrency(Number(m.value_lost ?? 0))}
                           </span>
                         </td>
-                        <td style={{ padding: "11px 14px", maxWidth: 200 }}>
+                        <td className="tablet-col-hide" style={{ padding: "11px 14px", maxWidth: 200 }}>
                           {m.notes
                             ? <span style={{ fontSize: 12, color: "hsl(var(--text-sub))" }}>{m.notes}</span>
                             : <span style={{ fontSize: 12, color: "hsl(var(--text-muted))", fontStyle: "italic" }}>Sin notas</span>
@@ -313,6 +316,7 @@ export default function SalidasClient({ movimientos: initial, productos }: Props
                         </td>
                         <td style={{ padding: "11px 14px" }}>
                           <button
+                            data-icon-btn
                             onClick={() => confirmDelete(m)}
                             style={{
                               display: "flex", alignItems: "center", justifyContent: "center",
@@ -329,7 +333,7 @@ export default function SalidasClient({ movimientos: initial, productos }: Props
                   })}
                   {mermas.length === 0 && (
                     <tr>
-                      <td colSpan={7} style={{ padding: 48, textAlign: "center", color: "hsl(var(--text-muted))", fontSize: 14 }}>
+                      <td colSpan={isTablet ? 6 : 7} style={{ padding: 48, textAlign: "center", color: "hsl(var(--text-muted))", fontSize: 14 }}>
                         Sin mermas registradas
                       </td>
                     </tr>

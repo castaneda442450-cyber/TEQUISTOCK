@@ -9,7 +9,7 @@ interface MetricsRowProps {
 
 export function MetricsRow({ metrics }: MetricsRowProps) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20 }}>
+    <div className="tablet-metrics-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20 }}>
       <MetricCard
         label="Total Inventario"
         value={formatCurrency(metrics.totalInventario.value)}

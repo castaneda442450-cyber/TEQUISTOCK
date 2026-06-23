@@ -61,7 +61,7 @@ export default function ReportesClient() {
   const [openReport, setOpenReport] = useState<ReportType | null>(null);
 
   return (
-    <div style={{ padding: 28 }}>
+    <div className="tablet-page-content" style={{ padding: 28 }}>
       {/* Page header */}
       <div style={{ marginBottom: 24 }}>
         <h1

@@ -59,6 +59,7 @@ export function CompraDetailModal({ orden, onClose }: CompraDetailModalProps) {
             </h2>
           </div>
           <button
+            data-icon-btn
             onClick={onClose}
             style={{
               padding: 6, borderRadius: 6, border: "none",

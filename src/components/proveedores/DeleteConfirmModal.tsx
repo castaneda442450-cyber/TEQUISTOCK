@@ -75,6 +75,7 @@ export function DeleteConfirmModal({
             </h2>
           </div>
           <button
+            data-icon-btn
             onClick={onCancel}
             style={{
               padding: 6,

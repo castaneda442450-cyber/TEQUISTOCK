@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useTransition } from "react";
+import { useIsTablet } from "@/hooks/useIsTablet";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { sileo } from "sileo";
@@ -20,6 +21,7 @@ interface MermaModalProps {
 
 export function MermaModal({ open, productos, onClose, onSuccess }: MermaModalProps) {
   const [isPending, startTransition] = useTransition();
+  const isTablet = useIsTablet();
 
   const { register, handleSubmit, watch, reset, formState: { errors } } = useForm<MermaInput>({
     resolver: zodResolver(mermaSchema),
@@ -84,7 +86,7 @@ export function MermaModal({ open, productos, onClose, onSuccess }: MermaModalPr
       <div
         style={{
           width: "100%",
-          maxWidth: 520,
+          maxWidth: isTablet ? "calc(100% - 24px)" : 520,
           borderRadius: 12,
           boxShadow: "0 32px 80px rgba(0,0,0,0.28)",
           backgroundColor: "hsl(var(--surface))",
@@ -102,7 +104,7 @@ export function MermaModal({ open, productos, onClose, onSuccess }: MermaModalPr
           <h2 style={{ fontSize: 17, fontWeight: 700, color: "hsl(var(--text-main))", margin: 0 }}>
             Registrar Merma
           </h2>
-          <button onClick={onClose} style={{ padding: 6, borderRadius: 6, border: "none", background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", color: "hsl(var(--text-muted))" }}>
+          <button data-icon-btn onClick={onClose} style={{ padding: 6, borderRadius: 6, border: "none", background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", color: "hsl(var(--text-muted))" }}>
             <X size={18} />
           </button>
         </div>

@@ -196,3 +196,49 @@ input:focus, textarea:focus, select:focus {
 .dark [data-sileo-toast][data-state="info"] {
   --sileo-state-info: #1C1714;
 }
+
+/* === Responsive Tablet (iPad A16) — max 1100px === */
+@media (max-width: 1100px) {
+
+  /* Touch targets — Apple HIG mínimo 44px */
+  input, select, textarea {
+    font-size: 16px !important;
+    min-height: 44px !important;
+  }
+
+  /* Solo botones principales — excluye botones ícono (X, edit, trash) */
+  button:not([data-icon-btn]) {
+    min-height: 44px;
+  }
+
+  /* Dashboard: métricas 4-col → 2-col */
+  .tablet-metrics-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* Dashboard: gráficos 2-col → 1-col */
+  .tablet-charts-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Padding de página reducido */
+  .tablet-page-content {
+    padding: 16px 12px 32px !important;
+  }
+
+  /* Filter bar: permite múltiples líneas */
+  .tablet-filter-bar {
+    flex-wrap: wrap !important;
+    gap: 10px !important;
+  }
+
+  /* Columnas secundarias de tablas ocultas */
+  .tablet-col-hide {
+    display: none !important;
+  }
+
+  /* Títulos de página: máx 18px */
+  .tablet-page-title {
+    font-size: 18px !important;
+  }
+}

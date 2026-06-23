@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useTransition, useMemo } from "react";
+import { useIsTablet } from "@/hooks/useIsTablet";
 import { useForm } from "react-hook-form";
 import { sileo } from "sileo";
 import { X, Check, Loader2, Plus } from "lucide-react";
@@ -41,6 +42,7 @@ export function CompraModal({
   onSuccess,
 }: CompraModalProps) {
   const [isPending, startTransition] = useTransition();
+  const isTablet = useIsTablet();
   const [lines, setLines] = useState<LineItem[]>([{ product_id: "", qty: 1, price: 0 }]);
   // supplierHint: sugerencia de proveedor cuando el producto elegido pertenece a proveedores
   const [supplierHint, setSupplierHint] = useState<{ lineIdx: number; options: Proveedor[] } | null>(null);
@@ -208,7 +210,7 @@ export function CompraModal({
       <div
         style={{
           width: "100%",
-          maxWidth: 780,
+          maxWidth: isTablet ? "calc(100% - 24px)" : 780,
           borderRadius: 12,
           boxShadow: "0 32px 80px rgba(0,0,0,0.28)",
           backgroundColor: "hsl(var(--surface))",
@@ -231,6 +233,7 @@ export function CompraModal({
             {editTarget ? `Editar Compra: ${editTarget.folio}` : "Registrar Compra"}
           </h2>
           <button
+            data-icon-btn
             onClick={onClose}
             style={{
               padding: 6, borderRadius: 6, border: "none",
@@ -344,6 +347,7 @@ export function CompraModal({
                         style={{ ...inputStyle(false), fontVariantNumeric: "tabular-nums" }}
                       />
                       <button
+                        data-icon-btn
                         type="button"
                         onClick={() => removeLine(i)}
                         disabled={lines.length === 1}
@@ -411,6 +415,7 @@ export function CompraModal({
                           </button>
                         ))}
                         <button
+                          data-icon-btn
                           type="button"
                           onClick={() => setSupplierHint(null)}
                           style={{

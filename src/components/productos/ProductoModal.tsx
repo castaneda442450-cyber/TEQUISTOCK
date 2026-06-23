@@ -1,6 +1,7 @@
 "use client";
 
 import { useTransition, useEffect } from "react";
+import { useIsTablet } from "@/hooks/useIsTablet";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { sileo } from "sileo";
@@ -56,6 +57,7 @@ export function ProductoModal({
   onSuccess,
 }: ProductoModalProps) {
   const [isPending, startTransition] = useTransition();
+  const isTablet = useIsTablet();
 
   const {
     register,
@@ -137,7 +139,7 @@ export function ProductoModal({
       <div
         style={{
           width: "100%",
-          maxWidth: 540,
+          maxWidth: isTablet ? "calc(100% - 24px)" : 540,
           borderRadius: 12,
           boxShadow: "0 32px 80px rgba(0,0,0,0.28)",
           backgroundColor: "hsl(var(--surface))",
@@ -157,6 +159,7 @@ export function ProductoModal({
             {editTarget ? `Editar: ${editTarget.nombre}` : "Nuevo Producto"}
           </h2>
           <button
+            data-icon-btn
             onClick={onClose}
             style={{
               padding: 6,
@@ -190,7 +193,7 @@ export function ProductoModal({
             </div>
 
             {/* Categoría + Unidad */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isTablet ? "1fr" : "1fr 1fr", gap: 14 }}>
               <div>
                 <label style={labelStyle}>Categoría *</label>
                 <select
@@ -215,7 +218,7 @@ export function ProductoModal({
             </div>
 
             {/* Stock mínimo + Precio */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isTablet ? "1fr" : "1fr 1fr", gap: 14 }}>
               <div>
                 <label style={labelStyle}>Stock Mínimo *</label>
                 <input

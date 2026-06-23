@@ -20,7 +20,7 @@ export function DashboardClient({
   chartsRow,
 }: DashboardClientProps) {
   return (
-    <div className="flex flex-col" style={{ padding: "32px 32px 48px", gap: 28 }}>
+    <div className="flex flex-col tablet-page-content" style={{ padding: "32px 32px 48px", gap: 28 }}>
       {filterBar}
       {criticalAlerts}
       {metricsRow}

@@ -209,6 +209,7 @@ export function ProductoSearchSelect({
         {/* Botón X para limpiar */}
         {value && !disabled && (
           <button
+            data-icon-btn
             type="button"
             onClick={handleClear}
             style={{

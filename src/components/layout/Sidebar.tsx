@@ -130,6 +130,11 @@ export function Sidebar({ productosBajoMinimo, diferenciasPendientes }: SidebarP
   const [signingOut, setSigningOut] = useState(false);
   const [hoveredHref, setHoveredHref] = useState<string | null>(null);
 
+  // Colapsar automáticamente en tablet al montar (SSR-safe: useState inicia en false)
+  useEffect(() => {
+    if (window.innerWidth <= 1100) setCollapsed(true);
+  }, []);
+
   useEffect(() => {
     document.documentElement.style.setProperty(
       '--sidebar-width',

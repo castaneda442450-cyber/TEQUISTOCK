@@ -11,7 +11,7 @@ interface ChartsRowProps {
 
 export function ChartsRow({ trend, gastoPorCategoria }: ChartsRowProps) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+    <div className="tablet-charts-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
       <SectionCard
         title="Tendencia de Gastos"
         icon={<TrendingUp size={15} color="#BA3026" strokeWidth={2.2} />}

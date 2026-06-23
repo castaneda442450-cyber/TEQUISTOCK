@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition, useEffect, useRef } from "react";
+import { useIsTablet } from "@/hooks/useIsTablet";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { sileo } from "sileo";
 import { Plus, Search, X } from "lucide-react";
@@ -45,6 +46,7 @@ export default function ProductosClient({
   const [showCatModal, setShowCatModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Producto | null>(null);
   const [, startNavTransition] = useTransition();
+  const isTablet = useIsTablet();
 
   // Sync categorias if server re-fetches with new list
   useEffect(() => {
@@ -133,12 +135,12 @@ export default function ProductosClient({
   }
 
   return (
-    <div style={{ padding: 28 }}>
+    <div className="tablet-page-content" style={{ padding: 28 }}>
       {/* Header: filters row */}
-      <div style={{ display: "flex", alignItems: "center", gap: 48, marginBottom: 22 }}>
+      <div className="tablet-filter-bar" style={{ display: "flex", alignItems: "center", gap: 48, marginBottom: 22 }}>
 
         {/* Search */}
-        <div style={{ position: "relative", width: 220, flexShrink: 0 }}>
+        <div style={{ position: "relative", width: isTablet ? undefined : 220, flex: isTablet ? 1 : undefined, minWidth: 160, flexShrink: 0 }}>
           <Search
             size={15}
             style={{
@@ -162,6 +164,7 @@ export default function ProductosClient({
           {searchInput && (
             <button
               type="button"
+              data-icon-btn
               onClick={clearSearch}
               style={{
                 position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)",

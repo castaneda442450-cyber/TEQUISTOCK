@@ -129,7 +129,7 @@ export default function ProveedoresClient({
   }
 
   return (
-    <div style={{ padding: 28 }}>
+    <div className="tablet-page-content" style={{ padding: 28 }}>
       {/* Header */}
       <div
         style={{
@@ -172,6 +172,7 @@ export default function ProveedoresClient({
           />
           {searchInput && (
             <button
+              data-icon-btn
               type="button"
               onClick={clearSearch}
               style={{

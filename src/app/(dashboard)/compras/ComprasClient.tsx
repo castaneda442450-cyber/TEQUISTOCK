@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useTransition } from "react";
+import { useIsTablet } from "@/hooks/useIsTablet";
 import { sileo } from "sileo";
 import { ChevronDown, ChevronUp, Plus, Eye, Pencil, Trash2, FileText } from "lucide-react";
 import { deleteOrden } from "@/lib/actions/compras.actions";
@@ -28,6 +29,7 @@ type ModalState = "create" | "edit" | "view" | "delete" | null;
 
 
 export default function ComprasClient({ ordenes: initial, proveedores, productos, initialFilters }: Props) {
+  const isTablet = useIsTablet();
   const [ordenes, setOrdenes] = useState(initial);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [modal, setModal] = useState<ModalState>(null);
@@ -106,7 +108,7 @@ export default function ComprasClient({ ordenes: initial, proveedores, productos
   const COL_WIDTHS = "32px 120px 140px 1fr 90px 110px 80px 100px";
 
   return (
-    <div style={{ padding: 28 }}>
+    <div className="tablet-page-content" style={{ padding: 28 }}>
       {/* Page header */}
       <div style={{ marginBottom: 20 }}>
         <h1 style={{ fontSize: 20, fontWeight: 700, color: "hsl(var(--text-main))", margin: 0 }}>
@@ -215,7 +217,7 @@ export default function ComprasClient({ ordenes: initial, proveedores, productos
               <tr style={{ backgroundColor: "hsl(var(--surface-alt))" }}>
                 <th style={thStyle}></th>
                 <th style={thStyle}>Fecha</th>
-                <th style={thStyle}>Folio</th>
+                <th className="tablet-col-hide" style={thStyle}>Folio</th>
                 <th style={thStyle}>Proveedor</th>
                 <th style={{ ...thStyle, textAlign: "center" }}>Productos</th>
                 <th style={{ ...thStyle, textAlign: "right" }}>Total</th>
@@ -259,7 +261,7 @@ export default function ComprasClient({ ordenes: initial, proveedores, productos
                       </td>
 
                       {/* Folio */}
-                      <td style={{ padding: "11px 14px" }}>
+                      <td className="tablet-col-hide" style={{ padding: "11px 14px" }}>
                         <span style={{ fontFamily: "monospace", fontSize: 12, color: "hsl(var(--text-sub))" }}>
                           {row.folio}
                         </span>
@@ -334,7 +336,7 @@ export default function ComprasClient({ ordenes: initial, proveedores, productos
                     {/* Expanded detail row */}
                     {isExpanded && (
                       <tr style={{ backgroundColor: "hsl(var(--surface-alt))" }}>
-                        <td colSpan={8} style={{ padding: "12px 24px 16px" }}>
+                        <td colSpan={isTablet ? 7 : 8} style={{ padding: "12px 24px 16px" }}>
                           <div style={{
                             fontSize: 11,
                             fontWeight: 700,
@@ -407,7 +409,7 @@ export default function ComprasClient({ ordenes: initial, proveedores, productos
 
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={8} style={{ padding: 48, textAlign: "center", color: "hsl(var(--text-muted))", fontSize: 14 }}>
+                  <td colSpan={isTablet ? 7 : 8} style={{ padding: 48, textAlign: "center", color: "hsl(var(--text-muted))", fontSize: 14 }}>
                     {hasFilters ? "Sin compras con los filtros aplicados" : "Sin compras registradas"}
                   </td>
                 </tr>
@@ -458,6 +460,7 @@ function ActionBtn({
 }) {
   return (
     <button
+      data-icon-btn
       type="button"
       onClick={onClick}
       title={title}
