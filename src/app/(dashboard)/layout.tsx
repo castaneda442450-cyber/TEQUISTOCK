@@ -21,10 +21,7 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
         diferenciasPendientes={alerts.diferenciasPendientes}
       />
 
-      <div
-        className="flex-1 flex flex-col min-w-0"
-        style={{ marginLeft: "var(--sidebar-width, 240px)", transition: "margin-left 0.3s ease" }}
-      >
+      <div className="flex-1 flex flex-col min-w-0 dashboard-content">
         <TopBar userEmail={user.username} />
 
         <main className="flex-1 overflow-y-auto" style={{ backgroundColor: "hsl(var(--bg))" }}>

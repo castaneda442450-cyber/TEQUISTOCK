@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   LayoutDashboard,
   Package,
@@ -22,6 +22,7 @@ import {
 import { cn } from "@/lib/utils";
 import { signOut } from "@/lib/actions/auth.actions";
 import { useTheme } from "next-themes";
+import { useIsTablet } from "@/hooks/useIsTablet";
 
 interface NavItem {
   href: string;
@@ -126,9 +127,13 @@ interface SidebarProps {
 
 export function Sidebar({ productosBajoMinimo, diferenciasPendientes }: SidebarProps) {
   const pathname = usePathname();
+  const isTablet = useIsTablet();
   const [collapsed, setCollapsed] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [hoveredHref, setHoveredHref] = useState<string | null>(null);
+  const sidebarRef = useRef<HTMLElement>(null);
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
 
   // Colapsar automáticamente en tablet al montar (SSR-safe: useState inicia en false)
   useEffect(() => {
@@ -142,13 +147,28 @@ export function Sidebar({ productosBajoMinimo, diferenciasPendientes }: SidebarP
     );
   }, [collapsed]);
 
+  // Previene que el scroll del body capture gestos horizontales sobre el sidebar
+  useEffect(() => {
+    const el = sidebarRef.current;
+    if (!el) return;
+    const handler = (e: TouchEvent) => {
+      const dx = e.touches[0].clientX - touchStartX.current;
+      const dy = e.touches[0].clientY - touchStartY.current;
+      if (Math.abs(dx) > Math.abs(dy)) e.preventDefault();
+    };
+    el.addEventListener('touchmove', handler, { passive: false });
+    return () => el.removeEventListener('touchmove', handler);
+  }, []);
+
   const handleSignOut = async () => {
     setSigningOut(true);
     await signOut();
   };
 
   return (
+    <>
     <aside
+      ref={sidebarRef}
       style={{
         backgroundColor: "hsl(var(--nav-bg))",
         boxShadow: "4px 0 28px rgba(0, 0, 0, 0.55)",
@@ -161,6 +181,18 @@ export function Sidebar({ productosBajoMinimo, diferenciasPendientes }: SidebarP
         flexDirection: "column",
         transition: "width 0.3s ease",
         width: collapsed ? 72 : 240,
+      }}
+      onTouchStart={(e) => {
+        touchStartX.current = e.touches[0].clientX;
+        touchStartY.current = e.touches[0].clientY;
+      }}
+      onTouchEnd={(e) => {
+        const dx = e.changedTouches[0].clientX - touchStartX.current;
+        const dy = e.changedTouches[0].clientY - touchStartY.current;
+        if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50 && isTablet) {
+          if (dx > 0 && collapsed) setCollapsed(false);
+          if (dx < 0 && !collapsed) setCollapsed(true);
+        }
       }}
     >
       {/* Logo */}
@@ -197,7 +229,7 @@ export function Sidebar({ productosBajoMinimo, diferenciasPendientes }: SidebarP
       </div>
 
       {/* Nav sections */}
-      <nav style={{ flex: 1, padding: "8px 8px", display: "flex", flexDirection: "column", overflowY: "auto" }}>
+      <nav style={{ flex: 1, padding: "8px 8px", display: "flex", flexDirection: "column", overflowY: "auto", overscrollBehavior: "contain" }}>
         {NAV_SECTIONS.map((section) => (
           <div key={section.label}>
             {!collapsed && (
@@ -229,13 +261,14 @@ export function Sidebar({ productosBajoMinimo, diferenciasPendientes }: SidebarP
                       display: "flex",
                       alignItems: "center",
                       gap: 12,
-                      padding: collapsed ? "11px 8px" : "10px 12px",
+                      padding: collapsed ? "13px 8px" : "10px 12px",
                       justifyContent: collapsed ? "center" : "flex-start",
                       borderRadius: 8,
                       backgroundColor: isActive ? "rgba(255,255,255,0.15)" : "transparent",
                       transition: "background-color 0.15s ease",
                       position: "relative",
                       textDecoration: "none",
+                      touchAction: "manipulation",
                     }}
                     onMouseEnter={(e) => {
                       if (!isActive) (e.currentTarget as HTMLElement).style.backgroundColor = "rgba(255,255,255,0.08)";
@@ -299,26 +332,6 @@ export function Sidebar({ productosBajoMinimo, diferenciasPendientes }: SidebarP
                       }}>{tooltip}</div>
                     )}
 
-                    {/* Tooltip de label cuando colapsado */}
-                    {collapsed && (
-                      <span style={{
-                        position: "absolute",
-                        left: "100%",
-                        marginLeft: 8,
-                        padding: "4px 8px",
-                        background: "#1a1a2e",
-                        color: "white",
-                        fontSize: 12,
-                        borderRadius: 6,
-                        opacity: 0,
-                        pointerEvents: "none",
-                        whiteSpace: "nowrap",
-                        zIndex: 100,
-                        boxShadow: "0 4px 12px rgba(0,0,0,0.4)",
-                      }}>
-                        {label}
-                      </span>
-                    )}
                   </Link>
                 );
               })}
@@ -402,5 +415,22 @@ export function Sidebar({ productosBajoMinimo, diferenciasPendientes }: SidebarP
         </button>
       </div>
     </aside>
+
+    {/* Zona de toque invisible en borde izquierdo para swipe-to-expand cuando colapsado */}
+    {isTablet && collapsed && (
+      <div
+        style={{ position: 'fixed', left: 0, top: 0, width: 20, height: '100%', zIndex: 51 }}
+        onTouchStart={(e) => {
+          touchStartX.current = e.touches[0].clientX;
+          touchStartY.current = e.touches[0].clientY;
+        }}
+        onTouchEnd={(e) => {
+          const dx = e.changedTouches[0].clientX - touchStartX.current;
+          const dy = e.changedTouches[0].clientY - touchStartY.current;
+          if (dx > 50 && Math.abs(dx) > Math.abs(dy)) setCollapsed(false);
+        }}
+      />
+    )}
+    </>
   );
 }

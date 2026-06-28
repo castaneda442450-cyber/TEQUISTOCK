@@ -26,6 +26,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" suppressHydrationWarning className={plusJakarta.variable}>
+      <head>
+        <script dangerouslySetInnerHTML={{
+          __html: `(function(){if(window.innerWidth<=1100){document.documentElement.style.setProperty('--sidebar-width','72px');}})();`
+        }} />
+      </head>
       <body suppressHydrationWarning className="min-h-screen bg-bg text-text-main antialiased">
         <Providers>{children}</Providers>
         <ToasterClient />

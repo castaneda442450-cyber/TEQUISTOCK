@@ -153,8 +153,19 @@ input:focus, textarea:focus, select:focus {
   --sileo-state-warning: oklch(0.80 0.15 86);
 }
 
+/* Layout del dashboard: margen izquierdo sigue al sidebar */
+.dashboard-content {
+  margin-left: var(--sidebar-width, 240px);
+  transition: margin-left 0.3s ease;
+}
+
 /* === Responsive Tablet (iPad A16) — max 1100px === */
 @media (max-width: 1100px) {
+
+  /* Sidebar colapsado por defecto en tablet — evita flash en Safari iOS */
+  :root {
+    --sidebar-width: 72px;
+  }
 
   /* Touch targets — Apple HIG mínimo 44px */
   input, select, textarea {
