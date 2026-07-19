@@ -10,6 +10,7 @@ import {
   Truck,
   ShoppingCart,
   ClipboardCheck,
+  ScanBarcode,
   ArrowRightFromLine,
   BookOpen,
   BarChart3,
@@ -52,7 +53,8 @@ const NAV_SECTIONS: NavSection[] = [
   {
     label: "CONTROL DIARIO",
     items: [
-      { href: "/turno", label: "Cierre de Turno", icon: ClipboardCheck, badgeAlert: true, badgeDiff: true },
+      { href: "/turno",  label: "Cierre de Turno",   icon: ClipboardCheck, badgeAlert: true, badgeDiff: true },
+      { href: "/conteo", label: "Conteo por zonas",  icon: ScanBarcode },
     ],
   },
   {

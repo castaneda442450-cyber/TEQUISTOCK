@@ -461,3 +461,81 @@ BEGIN
   END LOOP;
 END;
 $$;
+
+-- MIGRACIÓN — Conteo por Zonas
+
+CREATE TABLE public.zonas (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  nombre text NOT NULL,
+  descripcion text,
+  color text NOT NULL DEFAULT '#0B4455',
+  icono text NOT NULL DEFAULT 'warehouse',
+  activo boolean NOT NULL DEFAULT true,
+  created_at timestamp DEFAULT now()
+);
+ALTER TABLE public.zonas ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "zonas_all" ON public.zonas FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+CREATE TABLE public.zona_productos (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  zona_id uuid NOT NULL REFERENCES public.zonas(id) ON DELETE CASCADE,
+  product_id uuid NOT NULL REFERENCES public.productos(id) ON DELETE CASCADE,
+  created_at timestamp DEFAULT now(),
+  UNIQUE(zona_id, product_id)
+);
+ALTER TABLE public.zona_productos ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "zona_productos_all" ON public.zona_productos FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+CREATE INDEX idx_zona_productos_zona_id    ON public.zona_productos(zona_id);
+CREATE INDEX idx_zona_productos_product_id ON public.zona_productos(product_id);
+
+-- FUNCIÓN RPC: procesar_conteo_zona
+-- NOTA: el caller (Server Action) debe enviar p_items ya ordenado por
+-- product_id ascendente para que el orden de los FOR UPDATE sea
+-- determinístico entre llamadas concurrentes y se evite deadlock.
+CREATE OR REPLACE FUNCTION public.procesar_conteo_zona(
+  p_items   jsonb,
+  p_user_id uuid
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_item             jsonb;
+  v_product_id       uuid;
+  v_cantidad_contada numeric(10,3);
+  v_stock_actual     numeric(10,3);
+  v_diff             numeric(10,3);
+  v_entradas         int := 0;
+  v_salidas          int := 0;
+  v_sin_cambio       int := 0;
+BEGIN
+  FOR v_item IN SELECT * FROM jsonb_array_elements(p_items)
+  LOOP
+    v_product_id       := (v_item->>'product_id')::uuid;
+    v_cantidad_contada := (v_item->>'cantidad_contada')::numeric;
+
+    SELECT stock_actual INTO v_stock_actual
+      FROM public.productos
+     WHERE id = v_product_id
+       FOR UPDATE;
+
+    v_diff := v_cantidad_contada - v_stock_actual;
+
+    IF v_diff > 0 THEN
+      INSERT INTO public.movimientos (product_id, tipo, qty, user_id, notes, fecha)
+      VALUES (v_product_id, 'entrada', v_diff, p_user_id, 'Ajuste por conteo de zona', now());
+      v_entradas := v_entradas + 1;
+    ELSIF v_diff < 0 THEN
+      INSERT INTO public.movimientos (product_id, tipo, qty, user_id, notes, fecha)
+      VALUES (v_product_id, 'salida', ABS(v_diff), p_user_id, 'Ajuste por conteo de zona', now());
+      v_salidas := v_salidas + 1;
+    ELSE
+      v_sin_cambio := v_sin_cambio + 1;
+    END IF;
+  END LOOP;
+
+  RETURN jsonb_build_object('entradas', v_entradas, 'salidas', v_salidas, 'sin_cambio', v_sin_cambio);
+END;
+$$;

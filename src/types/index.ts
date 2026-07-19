@@ -203,3 +203,39 @@ export interface CierreTurnoResumen {
   diferencias_detectadas: number;   // items with diferencia < -0.5 AND > 15% variance
   productos_bajo_minimo:  string[]; // nombres where post-RPC stock_actual < stock_minimo
 }
+
+// ─── Conteo por zonas ──────────────────────────────────────────────────────────
+
+export interface Zona {
+  id: string;
+  nombre: string;
+  descripcion: string | null;
+  color: string;
+  icono: string;
+  activo: boolean;
+  created_at: string;
+  productos?: Producto[];
+  total_productos?: number;
+}
+
+export interface ConteoZonaItem {
+  product_id: string;
+  nombre: string;
+  unidad: string;
+  stock_actual: number;
+  cantidad_contada: number | null;
+}
+
+export interface ConteoSesion {
+  zona_id: string;
+  frecuencia: 'diario' | 'semanal' | 'mensual';
+  items: ConteoZonaItem[];
+}
+
+export interface ConteoResumen {
+  ajustados: number;
+  entradas: number;
+  salidas: number;
+  sin_contar: number;
+  sin_cambio: number;
+}
