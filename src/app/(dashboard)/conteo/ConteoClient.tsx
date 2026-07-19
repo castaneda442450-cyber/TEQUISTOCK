@@ -5,6 +5,7 @@ import { ScanBarcode } from "lucide-react";
 import ListaView from "./ListaView";
 import ConteoView from "./ConteoView";
 import GestionarZonasModal from "./GestionarZonasModal";
+import { ZonaFormModal } from "./ZonaFormModal";
 import type { Zona, Producto } from "@/types";
 
 interface Props {
@@ -15,12 +16,12 @@ interface Props {
 interface GestionModalState {
   initialTab?: "mis-zonas" | "asignar";
   initialZonaId?: string;
-  initialEditZonaId?: string;
 }
 
 export default function ConteoClient({ zonas, productos }: Props) {
   const [vista, setVista] = useState<"lista" | "conteo">("lista");
   const [gestionModal, setGestionModal] = useState<GestionModalState | null>(null);
+  const [editingZona, setEditingZona] = useState<Zona | null>(null);
 
   return (
     <div className="tablet-page-content" style={{ padding: "28px 32px", maxWidth: 1100, margin: "0 auto" }}>
@@ -81,7 +82,7 @@ export default function ConteoClient({ zonas, productos }: Props) {
         <ListaView
           zonas={zonas}
           onCrearPrimeraZona={() => setGestionModal({ initialTab: "mis-zonas" })}
-          onEditZona={(id) => setGestionModal({ initialTab: "mis-zonas", initialEditZonaId: id })}
+          onEditZona={(id) => setEditingZona(zonas.find((z) => z.id === id) ?? null)}
           onGestionarProductos={(id) => setGestionModal({ initialTab: "asignar", initialZonaId: id })}
         />
       ) : (
@@ -94,9 +95,12 @@ export default function ConteoClient({ zonas, productos }: Props) {
           productos={productos}
           initialTab={gestionModal.initialTab}
           initialZonaId={gestionModal.initialZonaId}
-          initialEditZonaId={gestionModal.initialEditZonaId}
           onClose={() => setGestionModal(null)}
         />
+      )}
+
+      {editingZona && (
+        <ZonaFormModal zona={editingZona} onClose={() => setEditingZona(null)} />
       )}
     </div>
   );

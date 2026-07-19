@@ -9,7 +9,6 @@ import {
   Package,
   Truck,
   ShoppingCart,
-  ClipboardCheck,
   ScanBarcode,
   ArrowRightFromLine,
   BookOpen,
@@ -30,7 +29,6 @@ interface NavItem {
   label: string;
   icon: React.ElementType;
   badgeAlert?: boolean;
-  badgeDiff?: boolean;
   badgeBeta?: boolean;
   tooltip?: string;
 }
@@ -53,8 +51,7 @@ const NAV_SECTIONS: NavSection[] = [
   {
     label: "CONTROL DIARIO",
     items: [
-      { href: "/turno",  label: "Cierre de Turno",   icon: ClipboardCheck, badgeAlert: true, badgeDiff: true },
-      { href: "/conteo", label: "Conteo por zonas",  icon: ScanBarcode },
+      { href: "/conteo", label: "Conteo por zonas", icon: ScanBarcode },
     ],
   },
   {
@@ -124,10 +121,9 @@ function SidebarThemeToggle({ collapsed }: { collapsed: boolean }) {
 
 interface SidebarProps {
   productosBajoMinimo: number;
-  diferenciasPendientes: number;
 }
 
-export function Sidebar({ productosBajoMinimo, diferenciasPendientes }: SidebarProps) {
+export function Sidebar({ productosBajoMinimo }: SidebarProps) {
   const pathname = usePathname();
   const isTablet = useIsTablet();
   const [collapsed, setCollapsed] = useState(false);
@@ -249,10 +245,9 @@ export function Sidebar({ productosBajoMinimo, diferenciasPendientes }: SidebarP
             {collapsed && <div style={{ height: 8 }} />}
 
             <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-              {section.items.map(({ href, label, icon: Icon, badgeAlert, badgeDiff, badgeBeta, tooltip }) => {
+              {section.items.map(({ href, label, icon: Icon, badgeAlert, badgeBeta, tooltip }) => {
                 const isActive = pathname === href || pathname.startsWith(href + "/");
                 const showBadgeAlert = !collapsed && badgeAlert && productosBajoMinimo > 0;
-                const showBadgeDiff = !collapsed && badgeDiff && diferenciasPendientes > 0 && !showBadgeAlert;
 
                 return (
                   <Link
@@ -300,17 +295,6 @@ export function Sidebar({ productosBajoMinimo, diferenciasPendientes }: SidebarP
                         display: "flex", alignItems: "center", justifyContent: "center",
                         marginLeft: "auto", flexShrink: 0,
                       }}>!</span>
-                    )}
-
-                    {/* Badge numérico — diferencias pendientes */}
-                    {showBadgeDiff && (
-                      <span style={{
-                        minWidth: 18, height: 18, borderRadius: 9,
-                        background: "rgba(255,255,255,0.20)", color: "white",
-                        fontSize: 10, fontWeight: 700, padding: "0 5px",
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        marginLeft: "auto", flexShrink: 0,
-                      }}>{diferenciasPendientes}</span>
                     )}
 
                     {/* Badge "Beta" */}

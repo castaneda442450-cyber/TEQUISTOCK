@@ -13,7 +13,6 @@ import {
   getGastosPorProveedor,
   getMermaAnalisis,
   getMovimientosReporte,
-  getReporteSemanal,
   getReporteStockActual,
 } from "@/lib/actions/reportes.actions";
 import type {
@@ -21,20 +20,18 @@ import type {
   GastoProveedorResult,
   MermaResult,
   MovimientosResult,
-  ResumenSemanalResult,
   StockActualResult,
   EstadoStock,
 } from "@/lib/actions/reportes.actions";
 import { createClient } from "@/lib/supabase/client";
 
-export type ReportType = "gastos_producto" | "gastos_proveedor" | "merma" | "movimientos" | "resumen_semanal" | "stock_actual";
+export type ReportType = "gastos_producto" | "gastos_proveedor" | "merma" | "movimientos" | "stock_actual";
 
 type ReportData =
   | { type: "gastos_producto"; result: GastoProductoResult }
   | { type: "gastos_proveedor"; result: GastoProveedorResult }
   | { type: "merma"; result: MermaResult }
   | { type: "movimientos"; result: MovimientosResult }
-  | { type: "resumen_semanal"; result: ResumenSemanalResult }
   | { type: "stock_actual"; result: StockActualResult };
 
 const REPORT_NAMES: Record<ReportType, string> = {
@@ -42,7 +39,6 @@ const REPORT_NAMES: Record<ReportType, string> = {
   gastos_proveedor: "Gastos por Proveedor",
   merma: "Análisis de Merma",
   movimientos: "Movimientos de Inventario",
-  resumen_semanal: "Resumen Semanal — Cierres de Turno",
   stock_actual: "Stock Actual — Inventario Completo",
 };
 
@@ -61,31 +57,12 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function getUltimasSemanas(n = 4): { label: string; desde: string; hasta: string }[] {
-  const today = new Date();
-  const dow = today.getDay();
-  const daysToMon = dow === 0 ? 6 : dow - 1;
-  const thisMonday = new Date(today);
-  thisMonday.setDate(today.getDate() - daysToMon);
-  return Array.from({ length: n }, (_, i) => {
-    const lunes = new Date(thisMonday);
-    lunes.setDate(thisMonday.getDate() - i * 7);
-    const domingo = new Date(lunes);
-    domingo.setDate(lunes.getDate() + 6);
-    const fmt = (d: Date) => d.toISOString().slice(0, 10);
-    const labelL = lunes.toLocaleDateString("es-MX", { day: "numeric", month: "short" });
-    const labelD = domingo.toLocaleDateString("es-MX", { day: "numeric", month: "short" });
-    return { label: `Semana del ${labelL} al ${labelD}`, desde: fmt(lunes), hasta: fmt(domingo) };
-  });
-}
-
 function buildFilename(type: ReportType, desde: string, hasta: string, ext: "pdf" | "xlsx") {
   const tipo = {
     gastos_producto: "gastos-producto",
     gastos_proveedor: "gastos-proveedor",
     merma: "merma",
     movimientos: "movimientos",
-    resumen_semanal: "resumen-semanal",
     stock_actual: "stock-actual",
   }[type];
   const periodo = desde && hasta ? `${desde}_${hasta}` : "todo";
@@ -419,151 +396,6 @@ function MovimientosTable({ result }: { result: MovimientosResult }) {
   );
 }
 
-const TENDENCIA_COLORS: Record<string, string> = {
-  mejorando: "#106653",
-  estable: "#C2972E",
-  empeorando: "#BA3026",
-};
-const TENDENCIA_ARROWS: Record<string, string> = {
-  mejorando: "↑",
-  estable: "→",
-  empeorando: "↓",
-};
-
-function ResumenSemanalPreview({ result }: { result: ResumenSemanalResult }) {
-  const { resumen_general: rg, por_producto, alertas } = result;
-
-  const metricCards = [
-    { label: "Cierres realizados", value: `${rg.total_cierres} de 7`, color: "#0B4455" },
-    { label: "Valor consumido", value: formatCurrency(rg.valor_consumido_total), color: "#106653" },
-    { label: "Mermas detectadas", value: formatCurrency(rg.valor_merma_total), color: "#BA3026" },
-    { label: "Diferencias", value: `${rg.diferencias_detectadas} productos`, color: "#C2972E" },
-  ];
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      {/* Métricas */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
-        {metricCards.map((m) => (
-          <div
-            key={m.label}
-            style={{
-              background: "hsl(var(--surface-alt))",
-              borderRadius: 8,
-              padding: "14px 18px",
-              display: "flex",
-              flexDirection: "column",
-              gap: 4,
-            }}
-          >
-            <span style={{ fontSize: 11, fontWeight: 600, color: "hsl(var(--text-sub))", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-              {m.label}
-            </span>
-            <span style={{ fontSize: 20, fontWeight: 800, color: m.color, fontVariantNumeric: "tabular-nums" }}>
-              {m.value}
-            </span>
-          </div>
-        ))}
-      </div>
-
-      {/* Tabla por producto */}
-      {por_producto.length > 0 && (
-        <div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: "hsl(var(--text-sub))", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>
-            Por Producto
-          </div>
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr>
-                  <th style={thStyle}>Producto</th>
-                  <th style={{ ...thStyle, textAlign: "right" }}>Consumo semana</th>
-                  <th style={{ ...thStyle, textAlign: "right" }}>Diferencia total</th>
-                  <th style={{ ...thStyle, textAlign: "right" }}>Valor diferencia</th>
-                  <th style={{ ...thStyle, textAlign: "center" }}>Tendencia</th>
-                </tr>
-              </thead>
-              <tbody>
-                {por_producto.map((row, ri) => {
-                  const color = TENDENCIA_COLORS[row.tendencia];
-                  const arrow = TENDENCIA_ARROWS[row.tendencia];
-                  const highlight = row.diferencia_total < 0;
-                  return (
-                    <tr key={row.product_id} style={highlight ? { background: "#FCEBEB" } : undefined}>
-                      <td style={{ ...tdStyle(ri), background: highlight ? "#FCEBEB" : undefined }}>
-                        <div style={{ fontWeight: 600 }}>{row.nombre}</div>
-                        <div style={{ fontSize: 11, color: "hsl(var(--text-muted))" }}>{row.unidad} · {row.categoria}</div>
-                      </td>
-                      <td style={{ ...tdStyle(ri, "right"), background: highlight ? "#FCEBEB" : undefined, fontVariantNumeric: "tabular-nums" }}>
-                        {row.consumo_total_semana}
-                      </td>
-                      <td style={{ ...tdStyle(ri, "right"), background: highlight ? "#FCEBEB" : undefined, fontWeight: 700, color: row.diferencia_total < 0 ? "#BA3026" : "#106653", fontVariantNumeric: "tabular-nums" }}>
-                        {row.diferencia_total > 0 ? "+" : ""}{row.diferencia_total.toFixed(2)}
-                      </td>
-                      <td style={{ ...tdStyle(ri, "right"), background: highlight ? "#FCEBEB" : undefined, fontWeight: 700, color: row.valor_diferencia < 0 ? "#BA3026" : "#106653", fontVariantNumeric: "tabular-nums" }}>
-                        {formatCurrency(Math.abs(row.valor_diferencia))}
-                      </td>
-                      <td style={{ ...tdStyle(ri, "center"), background: highlight ? "#FCEBEB" : undefined }}>
-                        <span style={{ fontWeight: 700, fontSize: 16, color }}>
-                          {arrow}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {por_producto.length === 0 && (
-        <div style={{ textAlign: "center", padding: 32, color: "hsl(var(--text-muted))", fontSize: 14 }}>
-          Sin cierres de turno registrados para la semana seleccionada
-        </div>
-      )}
-
-      {/* Alertas */}
-      <div>
-        <div style={{ fontSize: 12, fontWeight: 700, color: "hsl(var(--text-sub))", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>
-          Alertas de la semana
-        </div>
-        {alertas.length === 0 ? (
-          <div style={{ color: "#106653", fontWeight: 600, fontSize: 13 }}>
-            ✓ Sin alertas esta semana — todo dentro de parámetros normales
-          </div>
-        ) : (
-          <ul style={{ margin: 0, paddingLeft: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 6 }}>
-            {alertas.map((a, i) => (
-              <li key={i} style={{ fontSize: 13, color: "#BA3026", display: "flex", gap: 8, alignItems: "flex-start" }}>
-                <span>⚠</span>
-                <span>{a}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-
-      {/* Días sin cierre */}
-      {rg.dias_sin_cierre.length > 0 && (
-        <div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: "hsl(var(--text-sub))", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>
-            Días sin cierre
-          </div>
-          <ul style={{ margin: 0, paddingLeft: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 4 }}>
-            {rg.dias_sin_cierre.map((d) => (
-              <li key={d} style={{ fontSize: 13, color: "#BA3026" }}>
-                {new Date(d + "T00:00:00").toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" })}
-                {" — Sin registro de cierre ese día"}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ─── Stock Actual Preview ─────────────────────────────────────────────────────
 
 const ESTADO_STYLES: Record<EstadoStock, { bg: string; fg: string; label: string }> = {
@@ -709,22 +541,6 @@ function buildSheetRows(data: ReportData): (string | number)[][] {
     ]);
     return [header, ...rows, [], ["", "", "", "TOTAL PERDIDO", data.result.total_perdido, ""]];
   }
-  if (data.type === "resumen_semanal") {
-    const rg = data.result.resumen_general;
-    const header = ["Producto", "Unidad", "Categoría", "Consumo semana", "Diferencia total", "Valor diferencia (MXN)", "Tendencia"];
-    const rows = data.result.por_producto.map((r) => [
-      r.nombre, r.unidad, r.categoria,
-      r.consumo_total_semana, r.diferencia_total, r.valor_diferencia, r.tendencia,
-    ]);
-    return [
-      header,
-      ...rows,
-      [],
-      ["", "", "", "Cierres realizados", rg.total_cierres + " de 7", "", ""],
-      ["", "", "", "Valor consumido", rg.valor_consumido_total, "", ""],
-      ["", "", "", "Mermas detectadas", rg.valor_merma_total, "", ""],
-    ];
-  }
   // movimientos
   const header = ["Fecha", "Tipo", "Producto", "Cantidad", "Referencia"];
   const rows = data.result.rows.map((r) => [
@@ -745,8 +561,6 @@ interface ReportModalProps {
 }
 
 export function ReportModal({ type, onClose }: ReportModalProps) {
-  const semanas = React.useMemo(() => getUltimasSemanas(4), []);
-  const [selectedSemana, setSelectedSemana] = useState(0);
   const [desde, setDesde] = useState(firstDayOfMonth);
   const [hasta, setHasta] = useState(today);
   const [data, setData] = useState<ReportData | null>(null);
@@ -762,13 +576,6 @@ export function ReportModal({ type, onClose }: ReportModalProps) {
   useEffect(() => {
     overlayRef.current?.focus();
   }, []);
-
-  useEffect(() => {
-    if (type === "resumen_semanal" && semanas[selectedSemana]) {
-      setDesde(semanas[selectedSemana].desde);
-      setHasta(semanas[selectedSemana].hasta);
-    }
-  }, [selectedSemana, type, semanas]);
 
   // Resetear filtros de stock_actual al cambiar tipo
   useEffect(() => {
@@ -799,8 +606,6 @@ export function ReportModal({ type, onClose }: ReportModalProps) {
         res = await getGastosPorProveedor(desde, hasta);
       } else if (type === "merma") {
         res = await getMermaAnalisis(desde, hasta);
-      } else if (type === "resumen_semanal") {
-        res = await getReporteSemanal(desde, hasta);
       } else if (type === "stock_actual") {
         res = await getReporteStockActual(
           categoriaFiltro || null,
@@ -970,28 +775,9 @@ export function ReportModal({ type, onClose }: ReportModalProps) {
             }}
           >
             <span style={{ fontSize: 12, fontWeight: 600, color: "hsl(var(--text-sub))" }}>
-              {type === "resumen_semanal" ? "Semana:" : type === "stock_actual" ? "Filtros:" : "Período:"}
+              {type === "stock_actual" ? "Filtros:" : "Período:"}
             </span>
-            {type === "resumen_semanal" ? (
-              <select
-                value={selectedSemana}
-                onChange={(e) => setSelectedSemana(Number(e.target.value))}
-                style={{
-                  border: "1px solid hsl(var(--border))",
-                  borderRadius: 8,
-                  padding: "7px 10px",
-                  fontSize: 13,
-                  background: "hsl(var(--surface))",
-                  color: "hsl(var(--text-main))",
-                  outline: "none",
-                  cursor: "pointer",
-                }}
-              >
-                {semanas.map((s, i) => (
-                  <option key={i} value={i}>{s.label}</option>
-                ))}
-              </select>
-            ) : type === "stock_actual" ? (
+            {type === "stock_actual" ? (
               <>
                 <select
                   value={categoriaFiltro}
@@ -1110,8 +896,6 @@ export function ReportModal({ type, onClose }: ReportModalProps) {
               <MermaTable result={data.result} />
             ) : data?.type === "movimientos" ? (
               <MovimientosTable result={data.result} />
-            ) : data?.type === "resumen_semanal" ? (
-              <ResumenSemanalPreview result={data.result} />
             ) : data?.type === "stock_actual" ? (
               <StockActualPreview result={data.result} />
             ) : null}

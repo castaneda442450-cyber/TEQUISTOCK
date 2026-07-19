@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Package, Users, Trash2, History, CalendarDays, Archive } from "lucide-react";
+import { Package, Users, Trash2, History, Archive } from "lucide-react";
 import { ReportModal, type ReportType } from "@/components/reportes/ReportModal";
 
 interface ReportCardConfig {
@@ -40,13 +40,6 @@ const REPORT_CARDS: ReportCardConfig[] = [
     color: "#106653",
     title: "Movimientos de Inventario",
     desc: "Historial cronológico de entradas y salidas con balance acumulado por producto.",
-  },
-  {
-    type: "resumen_semanal",
-    icon: CalendarDays,
-    color: "#C2972E",
-    title: "Resumen Semanal",
-    desc: "Consolida los cierres de turno de la semana: consumos, diferencias detectadas, mermas y alertas por producto.",
   },
   {
     type: "stock_actual",

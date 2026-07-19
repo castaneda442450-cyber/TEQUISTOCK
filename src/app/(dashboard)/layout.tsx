@@ -16,10 +16,7 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ backgroundColor: "hsl(var(--bg))" }}>
-      <Sidebar
-        productosBajoMinimo={alerts.productosBajoMinimo}
-        diferenciasPendientes={alerts.diferenciasPendientes}
-      />
+      <Sidebar productosBajoMinimo={alerts.productosBajoMinimo} />
 
       <div className="flex-1 flex flex-col min-w-0 dashboard-content">
         <TopBar userEmail={user.username} />

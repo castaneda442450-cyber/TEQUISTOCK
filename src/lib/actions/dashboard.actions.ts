@@ -202,60 +202,18 @@ function computeAvailableYears(
 
 export async function getSidebarAlerts(): Promise<{
   productosBajoMinimo: number;
-  diferenciasPendientes: number;
 }> {
   const auth = await requireAuth();
-  if (auth.error) return { productosBajoMinimo: 0, diferenciasPendientes: 0 };
+  if (auth.error) return { productosBajoMinimo: 0 };
 
   const supabase = await createServerClient();
 
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayStr = yesterday.toISOString().split("T")[0];
-
-  const [productosRes, conteosRes] = await Promise.all([
-    supabase.from("productos").select("stock_actual, stock_minimo"),
-    supabase
-      .from("conteos_fisicos")
-      .select("product_id, diferencia, qty_teorica, created_at")
-      .eq("fecha", yesterdayStr)
-      .lt("diferencia", 0),
-  ]);
+  const { data } = await supabase.from("productos").select("stock_actual, stock_minimo");
 
   // JS-side filter porque PostgREST no soporta comparación columna-a-columna
-  const productosBajoMinimo = (productosRes.data ?? []).filter(
+  const productosBajoMinimo = (data ?? []).filter(
     (p) => p.stock_actual < p.stock_minimo,
   ).length;
 
-  // Diferencias pendientes: conteos ayer con variación > -15% sin merma posterior.
-  // Se compara POR CONTEO INDIVIDUAL para evitar falsos negativos.
-  const significativos = (conteosRes.data ?? []).filter(
-    (c) => c.qty_teorica > 0 && c.diferencia / c.qty_teorica < -0.15,
-  );
-
-  let diferenciasPendientes = 0;
-  if (significativos.length > 0) {
-    const productIds = [...new Set(significativos.map((c) => c.product_id))];
-
-    const { data: mermas } = await supabase
-      .from("movimientos")
-      .select("product_id, created_at")
-      .eq("tipo", "merma")
-      .in("product_id", productIds)
-      .gte("fecha", yesterdayStr);
-
-    const mermasByProduct = new Map<string, string[]>();
-    for (const m of mermas ?? []) {
-      const list = mermasByProduct.get(m.product_id) ?? [];
-      list.push(m.created_at);
-      mermasByProduct.set(m.product_id, list);
-    }
-
-    diferenciasPendientes = significativos.filter((c) => {
-      const timestamps = mermasByProduct.get(c.product_id) ?? [];
-      return !timestamps.some((ts) => ts > c.created_at);
-    }).length;
-  }
-
-  return { productosBajoMinimo, diferenciasPendientes };
+  return { productosBajoMinimo };
 }
