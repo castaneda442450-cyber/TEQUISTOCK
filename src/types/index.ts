@@ -202,16 +202,9 @@ export interface ConteoZonaItem {
   cantidad_contada: number | null;
 }
 
-export interface ConteoSesion {
-  zona_id: string;
-  frecuencia: 'diario' | 'semanal' | 'mensual';
-  items: ConteoZonaItem[];
-}
-
 export interface ConteoResumen {
   ajustados: number;
   entradas: number;
   salidas: number;
-  sin_contar: number;
   sin_cambio: number;
 }

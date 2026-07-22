@@ -7,21 +7,23 @@ export const zonaSchema = z.object({
   icono:       z.string().min(1),
 });
 
-export const conteoZonaItemSchema = z.object({
-  product_id:       z.string().uuid(),
-  cantidad_contada: z.number().min(0),
+export const conteoMultiZonaTotalSchema = z.object({
+  product_id:   z.string().uuid(),
+  total_fisico: z.number().min(0),
 });
 
-// total_productos = cuántos productos se mostraron en el Paso 2 (de
-// getProductosDeZona), no solo los que trae `items` — permite calcular
-// sin_contar en el action sin una query extra.
-export const conteoZonaSchema = z.object({
-  zona_id:         z.string().uuid(),
-  frecuencia:      z.enum(["diario", "semanal", "mensual"]),
-  items:           z.array(conteoZonaItemSchema).min(1).max(200),
-  total_productos: z.number().int().min(1),
-});
+// totales = un total_fisico por producto, ya sumado por el cliente a través
+// de todas las zonas visitadas en la sesión.
+export const conteoMultiZonaSchema = z
+  .object({
+    frecuencia: z.enum(["diario", "semanal", "mensual"]),
+    totales:    z.array(conteoMultiZonaTotalSchema).min(1).max(500),
+  })
+  .refine(
+    (data) => new Set(data.totales.map((t) => t.product_id)).size === data.totales.length,
+    { message: "product_id duplicado en totales" },
+  );
 
-export type ZonaInput          = z.infer<typeof zonaSchema>;
-export type ConteoZonaItemInput = z.infer<typeof conteoZonaItemSchema>;
-export type ConteoZonaInput    = z.infer<typeof conteoZonaSchema>;
+export type ZonaInput               = z.infer<typeof zonaSchema>;
+export type ConteoMultiZonaTotalInput = z.infer<typeof conteoMultiZonaTotalSchema>;
+export type ConteoMultiZonaInput      = z.infer<typeof conteoMultiZonaSchema>;

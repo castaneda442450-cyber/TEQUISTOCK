@@ -539,3 +539,95 @@ BEGIN
   RETURN jsonb_build_object('entradas', v_entradas, 'salidas', v_salidas, 'sin_cambio', v_sin_cambio);
 END;
 $$;
+
+-- MIGRACIÓN — Conteo multi-zona (flujo guiado)
+
+-- FUNCIÓN RPC: procesar_conteo_multizona
+-- Reemplaza a procesar_conteo_zona para el flujo guiado multi-zona.
+-- procesar_conteo_zona se deja intacta en la BD (no se elimina) pero ya
+-- no la invoca la app.
+--
+-- El caller ya sumó, por producto, las cantidades contadas en TODAS las
+-- zonas visitadas en la sesión — cada product_id aparece UNA sola vez en
+-- p_totales con su total_fisico acumulado. Esto es lo que corrige el bug:
+-- se lee stock_actual UNA sola vez por producto (FOR UPDATE) y se compara
+-- contra el TOTAL acumulado, nunca contra ajustes intermedios de otras
+-- zonas.
+--
+-- NOTA: el caller debe enviar p_totales ya ordenado por product_id
+-- ascendente (mismo patrón anti-deadlock que procesar_conteo_zona).
+CREATE OR REPLACE FUNCTION public.procesar_conteo_multizona(
+  p_totales    jsonb,
+  p_user_id    uuid,
+  p_frecuencia text
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_item         jsonb;
+  v_product_id   uuid;
+  v_total_fisico numeric(10,3);
+  v_stock_actual numeric(10,3);
+  v_diff         numeric(10,3);
+  v_entradas     int := 0;
+  v_salidas      int := 0;
+  v_sin_cambio   int := 0;
+BEGIN
+  FOR v_item IN SELECT * FROM jsonb_array_elements(p_totales)
+  LOOP
+    v_product_id   := (v_item->>'product_id')::uuid;
+    v_total_fisico := (v_item->>'total_fisico')::numeric;
+
+    SELECT stock_actual INTO v_stock_actual
+      FROM public.productos
+     WHERE id = v_product_id
+       FOR UPDATE;
+
+    v_diff := v_total_fisico - v_stock_actual;
+
+    IF v_diff > 0 THEN
+      INSERT INTO public.movimientos (product_id, tipo, qty, user_id, notes, fecha)
+      VALUES (v_product_id, 'entrada', v_diff, p_user_id,
+              'Ajuste por conteo de zonas (' || p_frecuencia || ')', now());
+      v_entradas := v_entradas + 1;
+    ELSIF v_diff < 0 THEN
+      INSERT INTO public.movimientos (product_id, tipo, qty, user_id, notes, fecha)
+      VALUES (v_product_id, 'salida', ABS(v_diff), p_user_id,
+              'Ajuste por conteo de zonas (' || p_frecuencia || ')', now());
+      v_salidas := v_salidas + 1;
+    ELSE
+      v_sin_cambio := v_sin_cambio + 1;
+    END IF;
+  END LOOP;
+
+  RETURN jsonb_build_object('entradas', v_entradas, 'salidas', v_salidas, 'sin_cambio', v_sin_cambio);
+END;
+$$;
+
+-- FUNCIÓN RPC: get_zonas_pendientes
+-- Dado un conjunto de product_ids recién contados, la frecuencia elegida,
+-- y las zonas ya visitadas en la sesión (a excluir), retorna las zonas
+-- activas restantes que comparten al menos uno de esos productos con esa
+-- frecuencia. Solo lectura — no requiere SECURITY DEFINER, las políticas
+-- RLS existentes (SELECT para authenticated) ya permiten esta consulta.
+CREATE OR REPLACE FUNCTION public.get_zonas_pendientes(
+  p_product_ids     uuid[],
+  p_frecuencia      text,
+  p_zonas_excluidas uuid[]
+)
+RETURNS TABLE (id uuid, nombre text, color text, icono text)
+LANGUAGE sql
+STABLE
+AS $$
+  SELECT DISTINCT z.id, z.nombre, z.color, z.icono
+    FROM public.zonas z
+    JOIN public.zona_productos zp ON zp.zona_id = z.id
+    JOIN public.productos p ON p.id = zp.product_id
+   WHERE zp.product_id = ANY(p_product_ids)
+     AND p.frecuencia_conteo = p_frecuencia
+     AND z.id <> ALL(p_zonas_excluidas)
+     AND z.activo = true
+   ORDER BY z.nombre;
+$$;

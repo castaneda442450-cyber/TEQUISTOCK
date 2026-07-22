@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useTransition } from "react";
+import { useState, useMemo, useEffect, useTransition } from "react";
 import { useIsTablet } from "@/hooks/useIsTablet";
 import { sileo } from "sileo";
 import {
@@ -11,10 +11,15 @@ import {
   CalendarDays,
   CalendarRange,
   Check,
+  Info,
 } from "lucide-react";
-import { getProductosDeZona, procesarConteo } from "@/lib/actions/zonas.actions";
+import {
+  getProductosDeZona,
+  getZonasPendientes,
+  procesarConteoMultiZona,
+} from "@/lib/actions/zonas.actions";
 import { getZonaIcon } from "./zonaIcons";
-import type { Zona, ConteoSesion, ConteoResumen } from "@/types";
+import type { Zona, ConteoZonaItem, ConteoResumen } from "@/types";
 
 interface Props {
   zonas: Zona[];
@@ -22,6 +27,7 @@ interface Props {
 }
 
 type Frecuencia = "diario" | "semanal" | "mensual";
+type Fase = "seleccion" | "conteo" | "resumen";
 
 const FRECUENCIA_OPTS: { value: Frecuencia; label: string; desc: string; icon: typeof Clock3 }[] = [
   { value: "diario", label: "Diario", desc: "Productos de rotación diaria", icon: Clock3 },
@@ -48,19 +54,86 @@ function semaforoDeDiff(fisicaNum: number | null, stockActual: number): Semaforo
   return "rojo";
 }
 
+function fmtQty(n: number): string {
+  return Number.isInteger(n) ? String(n) : n.toFixed(1);
+}
+
+// ─── Sesión multi-zona (local a este archivo) ────────────────────────────────
+
+interface ZonaPendiente {
+  id: string;
+  nombre: string;
+  color: string;
+  icono: string;
+}
+
+interface ProductoEnSesion {
+  product_id: string;
+  nombre: string;
+  unidad: string;
+  stock_original: number; // se captura UNA sola vez, la primera vez que aparece
+  conteosPorZona: Record<string, number>; // zonaId -> cantidad_contada
+}
+
+interface ZonaVisitada {
+  zonaId: string;
+  zonaNombre: string;
+  productIds: string[];
+}
+
+interface SesionMultiZona {
+  frecuencia: Frecuencia;
+  productos: Record<string, ProductoEnSesion>;
+  zonasVisitadas: ZonaVisitada[];
+}
+
+type Nota =
+  | { tipo: "tambien_en"; zonas: string[] }
+  | { tipo: "ya_contado"; entradas: { zonaNombre: string; qty: number }[] };
+
+function notaProductoTexto(nota: Nota | null): string | null {
+  if (!nota) return null;
+  if (nota.tipo === "tambien_en") return `· también en ${nota.zonas.join(" y ")}`;
+  return `contaste ${nota.entradas.map((e) => `${fmtQty(e.qty)} en ${e.zonaNombre}`).join(", ")}`;
+}
+
+function mergeItemsEnSesion(sesion: SesionMultiZona, items: ConteoZonaItem[]): SesionMultiZona {
+  const productos = { ...sesion.productos };
+  for (const item of items) {
+    if (!productos[item.product_id]) {
+      productos[item.product_id] = {
+        product_id: item.product_id,
+        nombre: item.nombre,
+        unidad: item.unidad,
+        stock_original: item.stock_actual,
+        conteosPorZona: {},
+      };
+    }
+  }
+  return { ...sesion, productos };
+}
+
 export default function ConteoView({ zonas, onVolverALista }: Props) {
   const isTablet = useIsTablet();
   const zonasActivas = useMemo(() => zonas.filter((z) => z.activo), [zonas]);
 
-  const [paso, setPaso] = useState<1 | 2>(1);
+  // Paso 1
+  const [fase, setFase] = useState<Fase>("seleccion");
   const [zonaId, setZonaId] = useState<string | null>(zonasActivas[0]?.id ?? null);
   const [frecuencia, setFrecuencia] = useState<Frecuencia>("diario");
-  const [sesion, setSesion] = useState<ConteoSesion | null>(null);
-  const [inputs, setInputs] = useState<Record<string, string>>({});
-  const [mostrarResumen, setMostrarResumen] = useState(false);
   const [warningSinProductos, setWarningSinProductos] = useState(false);
+
+  // Zona actualmente en pantalla de conteo
+  const [zonaActualId, setZonaActualId] = useState<string | null>(null);
+  const [itemsZonaActual, setItemsZonaActual] = useState<ConteoZonaItem[]>([]);
+  const [inputsZonaActual, setInputsZonaActual] = useState<Record<string, string>>({});
+
+  // Sesión acumulada multi-zona
+  const [sesion, setSesion] = useState<SesionMultiZona | null>(null);
+  const [siguientesZonas, setSiguientesZonas] = useState<ZonaPendiente[] | null>(null);
+
   const [resumenFinal, setResumenFinal] = useState<ConteoResumen | null>(null);
-  const [isPendingIniciar, startIniciarTransition] = useTransition();
+  const [isPendingCargando, startCargandoTransition] = useTransition();
   const [isPendingAplicar, startAplicarTransition] = useTransition();
 
   const zonaSeleccionada = zonasActivas.find((z) => z.id === zonaId) ?? null;
@@ -74,38 +147,105 @@ export default function ConteoView({ zonas, onVolverALista }: Props) {
     return counts;
   }, [productosZona]);
 
-  const computedItems = useMemo(() => {
-    if (!sesion) return [];
-    return sesion.items.map((item) => {
-      const raw = inputs[item.product_id] ?? "";
+  const zonaActual = zonasActivas.find((z) => z.id === zonaActualId) ?? null;
+
+  const computedItemsZonaActual = useMemo(() => {
+    return itemsZonaActual.map((item) => {
+      const raw = inputsZonaActual[item.product_id] ?? "";
       const fisicaNum = raw === "" ? null : parseFloat(raw);
       const diff = fisicaNum === null ? null : fisicaNum - item.stock_actual;
       const semaforoColor = semaforoDeDiff(fisicaNum, item.stock_actual);
-      return { item, raw, fisicaNum, diff, semaforoColor };
-    });
-  }, [sesion, inputs]);
 
-  const resumenPreview = useMemo(() => {
+      let nota: Nota | null = null;
+      if (sesion) {
+        if (sesion.zonasVisitadas.length === 0) {
+          const otras = zonasActivas
+            .filter((z) => z.id !== zonaActualId)
+            .filter((z) =>
+              z.productos?.some((p) => p.id === item.product_id && p.frecuencia_conteo === frecuencia),
+            )
+            .map((z) => z.nombre);
+          if (otras.length > 0) nota = { tipo: "tambien_en", zonas: otras };
+        } else {
+          const prod = sesion.productos[item.product_id];
+          if (prod && Object.keys(prod.conteosPorZona).length > 0) {
+            const entradas = Object.entries(prod.conteosPorZona)
+              .map(([zid, qty]) => {
+                const zv = sesion.zonasVisitadas.find((z) => z.zonaId === zid);
+                return zv ? { zonaNombre: zv.zonaNombre, qty } : null;
+              })
+              .filter((e): e is { zonaNombre: string; qty: number } => e !== null);
+            if (entradas.length > 0) nota = { tipo: "ya_contado", entradas };
+          }
+        }
+      }
+
+      return { item, raw, fisicaNum, diff, semaforoColor, nota };
+    });
+  }, [itemsZonaActual, inputsZonaActual, sesion, zonasActivas, zonaActualId, frecuencia]);
+
+  const todosLlenos =
+    itemsZonaActual.length > 0 && computedItemsZonaActual.every((r) => r.fisicaNum !== null);
+  const totalItems = itemsZonaActual.length;
+  const llenos = computedItemsZonaActual.filter((r) => r.fisicaNum !== null).length;
+
+  // Precarga de zonas pendientes en cuanto la zona actual queda completa.
+  useEffect(() => {
+    if (!sesion || !zonaActualId || !todosLlenos) {
+      setSiguientesZonas(null);
+      return;
+    }
+    let cancelado = false;
+    setSiguientesZonas(null);
+    getZonasPendientes(itemsZonaActual.map((i) => i.product_id), frecuencia, [
+      ...sesion.zonasVisitadas.map((z) => z.zonaId),
+      zonaActualId,
+    ]).then((res) => {
+      if (!cancelado) setSiguientesZonas(res.error ? [] : (res.data ?? []));
+    });
+    return () => {
+      cancelado = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [todosLlenos, zonaActualId, frecuencia]);
+
+  const mostrarBreadcrumb =
+    !!sesion && (sesion.zonasVisitadas.length >= 2 || (fase === "conteo" && sesion.zonasVisitadas.length === 1));
+
+  const resumenFinalPreview = useMemo(() => {
+    if (!sesion) return null;
+    const rows = Object.values(sesion.productos)
+      .map((p) => {
+        const total = Object.values(p.conteosPorZona).reduce((s, q) => s + q, 0);
+        const diff = total - p.stock_original;
+        const breakdown = Object.entries(p.conteosPorZona).map(([zid, qty]) => {
+          const zv = sesion.zonasVisitadas.find((z) => z.zonaId === zid);
+          return { zonaNombre: zv?.zonaNombre ?? "", qty };
+        });
+        return { ...p, total, diff, breakdown };
+      })
+      .sort((a, b) => a.nombre.localeCompare(b.nombre));
+
     let entradas = 0;
     let salidas = 0;
     let sin_cambio = 0;
-    let sin_contar = 0;
-    computedItems.forEach((r) => {
-      if (r.fisicaNum === null) sin_contar++;
-      else if (r.diff! > 0) entradas++;
-      else if (r.diff! < 0) salidas++;
+    rows.forEach((r) => {
+      if (r.diff > 0) entradas++;
+      else if (r.diff < 0) salidas++;
       else sin_cambio++;
     });
-    return { ajustados: entradas + salidas, entradas, salidas, sin_cambio, sin_contar };
-  }, [computedItems]);
+    return { rows, entradas, salidas, sin_cambio, ajustados: entradas + salidas };
+  }, [sesion]);
 
-  function resetAPaso1() {
-    setPaso(1);
+  function resetTodo() {
+    setFase("seleccion");
     setSesion(null);
-    setInputs({});
-    setMostrarResumen(false);
-    setWarningSinProductos(false);
+    setZonaActualId(null);
+    setItemsZonaActual([]);
+    setInputsZonaActual({});
+    setSiguientesZonas(null);
     setResumenFinal(null);
+    setWarningSinProductos(false);
   }
 
   function handleIniciarConteo() {
@@ -115,7 +255,7 @@ export default function ConteoView({ zonas, onVolverALista }: Props) {
       return;
     }
     setWarningSinProductos(false);
-    startIniciarTransition(async () => {
+    startCargandoTransition(async () => {
       const res = await getProductosDeZona(zonaSeleccionada.id, frecuencia);
       if (res.error) {
         sileo.error({ title: res.error });
@@ -125,31 +265,101 @@ export default function ConteoView({ zonas, onVolverALista }: Props) {
         setWarningSinProductos(true);
         return;
       }
-      setSesion({ zona_id: zonaSeleccionada.id, frecuencia, items: res.data });
-      setInputs({});
-      setMostrarResumen(false);
-      setPaso(2);
+      const nuevaSesion = mergeItemsEnSesion(
+        { frecuencia, productos: {}, zonasVisitadas: [] },
+        res.data,
+      );
+      setSesion(nuevaSesion);
+      setZonaActualId(zonaSeleccionada.id);
+      setItemsZonaActual(res.data);
+      setInputsZonaActual({});
+      setFase("conteo");
     });
   }
 
-  function handleBotonPrincipal() {
-    if (!mostrarResumen) {
-      setMostrarResumen(true);
+  function handleSiguienteOResumen() {
+    if (!todosLlenos || siguientesZonas === null || !sesion || !zonaActualId || !zonaActual) return;
+
+    const productosActualizados = { ...sesion.productos };
+    computedItemsZonaActual.forEach((r) => {
+      const prod = productosActualizados[r.item.product_id];
+      if (prod) {
+        productosActualizados[r.item.product_id] = {
+          ...prod,
+          conteosPorZona: { ...prod.conteosPorZona, [zonaActualId]: r.fisicaNum! },
+        };
+      }
+    });
+
+    const zonasVisitadasActualizadas: ZonaVisitada[] = [
+      ...sesion.zonasVisitadas.filter((z) => z.zonaId !== zonaActualId),
+      {
+        zonaId: zonaActualId,
+        zonaNombre: zonaActual.nombre,
+        productIds: itemsZonaActual.map((i) => i.product_id),
+      },
+    ];
+
+    const sesionActualizada: SesionMultiZona = {
+      ...sesion,
+      productos: productosActualizados,
+      zonasVisitadas: zonasVisitadasActualizadas,
+    };
+    setSesion(sesionActualizada);
+
+    if (siguientesZonas.length === 0) {
+      setFase("resumen");
       return;
     }
+
+    const siguiente = siguientesZonas[0];
+    const productIdsActuales = itemsZonaActual.map((i) => i.product_id);
+
+    startCargandoTransition(async () => {
+      const res = await getProductosDeZona(siguiente.id, frecuencia);
+      if (res.error) {
+        sileo.error({ title: res.error });
+        return;
+      }
+      if (res.data.length > 0) {
+        setSesion((prev) => (prev ? mergeItemsEnSesion(prev, res.data) : prev));
+        setZonaActualId(siguiente.id);
+        setItemsZonaActual(res.data);
+        setInputsZonaActual({});
+        return;
+      }
+
+      // Membresía desactualizada: la zona predicha ya no tiene productos.
+      // Reintentar una vez excluyéndola también.
+      const retry = await getZonasPendientes(productIdsActuales, frecuencia, [
+        ...zonasVisitadasActualizadas.map((z) => z.zonaId),
+        siguiente.id,
+      ]);
+      const siguiente2 = !retry.error && retry.data && retry.data.length > 0 ? retry.data[0] : null;
+      if (siguiente2) {
+        const res2 = await getProductosDeZona(siguiente2.id, frecuencia);
+        if (!res2.error && res2.data.length > 0) {
+          setSesion((prev) => (prev ? mergeItemsEnSesion(prev, res2.data) : prev));
+          setZonaActualId(siguiente2.id);
+          setItemsZonaActual(res2.data);
+          setInputsZonaActual({});
+          return;
+        }
+      }
+      setFase("resumen");
+    });
+  }
+
+  function handleAplicarAjustes() {
     if (!sesion) return;
-    const items = computedItems
-      .filter((r) => r.fisicaNum !== null)
-      .map((r) => ({ product_id: r.item.product_id, cantidad_contada: r.fisicaNum! }));
-    if (items.length === 0) return;
+    const totales = Object.values(sesion.productos).map((p) => ({
+      product_id: p.product_id,
+      total_fisico: Object.values(p.conteosPorZona).reduce((s, q) => s + q, 0),
+    }));
+    if (totales.length === 0) return;
 
     startAplicarTransition(async () => {
-      const res = await procesarConteo({
-        zona_id: sesion.zona_id,
-        frecuencia: sesion.frecuencia,
-        items,
-        total_productos: sesion.items.length,
-      });
+      const res = await procesarConteoMultiZona({ frecuencia: sesion.frecuencia, totales });
       if (res.error) {
         sileo.error({ title: res.error });
         return;
@@ -158,17 +368,28 @@ export default function ConteoView({ zonas, onVolverALista }: Props) {
     });
   }
 
-  const btnAplicarDisabled =
-    isPendingAplicar || (mostrarResumen && resumenPreview.sin_contar === sesion?.items.length);
+  const btnPrincipalDisabled = isPendingCargando || !todosLlenos || siguientesZonas === null;
+  const btnPrincipalLabel = !todosLlenos
+    ? "Siguiente →"
+    : siguientesZonas === null
+      ? "Calculando..."
+      : siguientesZonas.length > 0
+        ? "Siguiente →"
+        : "Ver resumen →";
 
+  const bannerCompartidos = computedItemsZonaActual.filter(
+    (r) => r.nota?.tipo === "ya_contado",
+  );
+
+  // ───────── RENDER ─────────
   return (
     <div>
       {/* Barra de pasos */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 24, flexWrap: "wrap" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <StepPill num={1} label="Zona y temporalidad" active={paso === 1} done={paso === 2} />
+          <StepPill num={1} label="Zona y temporalidad" active={fase === "seleccion"} done={fase !== "seleccion"} />
           <div style={{ flex: 1, maxWidth: 60, height: 2, background: "hsl(var(--border))" }} />
-          <StepPill num={2} label="Contar y confirmar" active={paso === 2} done={false} />
+          <StepPill num={2} label="Contar y confirmar" active={fase === "conteo" || fase === "resumen"} done={false} />
         </div>
         <button
           onClick={onVolverALista}
@@ -187,7 +408,15 @@ export default function ConteoView({ zonas, onVolverALista }: Props) {
         </button>
       </div>
 
-      {paso === 1 && (
+      {mostrarBreadcrumb && sesion && (
+        <ZonaBreadcrumb
+          completadas={sesion.zonasVisitadas}
+          zonaActualId={zonaActualId}
+          siguiente={fase === "conteo" && siguientesZonas && siguientesZonas.length > 0 ? siguientesZonas[0] : null}
+        />
+      )}
+
+      {fase === "seleccion" && (
         <div>
           {zonasActivas.length === 0 ? (
             <div
@@ -336,7 +565,7 @@ export default function ConteoView({ zonas, onVolverALista }: Props) {
               )}
 
               <button
-                disabled={!zonaSeleccionada || isPendingIniciar}
+                disabled={!zonaSeleccionada || isPendingCargando}
                 onClick={handleIniciarConteo}
                 style={{
                   display: "flex",
@@ -353,7 +582,7 @@ export default function ConteoView({ zonas, onVolverALista }: Props) {
                   cursor: !zonaSeleccionada ? "not-allowed" : "pointer",
                 }}
               >
-                {isPendingIniciar && <Loader2 size={15} style={{ animation: "spin 0.7s linear infinite" }} />}
+                {isPendingCargando && <Loader2 size={15} style={{ animation: "spin 0.7s linear infinite" }} />}
                 Iniciar conteo →
               </button>
             </>
@@ -361,7 +590,7 @@ export default function ConteoView({ zonas, onVolverALista }: Props) {
         </div>
       )}
 
-      {paso === 2 && sesion && (
+      {fase === "conteo" && sesion && zonaActual && (
         <div>
           <div
             style={{
@@ -376,10 +605,56 @@ export default function ConteoView({ zonas, onVolverALista }: Props) {
               color: "hsl(var(--text-sub))",
             }}
           >
-            <strong style={{ color: "hsl(var(--text-main))" }}>{zonaSeleccionada?.nombre}</strong>
+            <strong style={{ color: "hsl(var(--text-main))" }}>{zonaActual.nombre}</strong>
             <span>·</span>
             <span>
-              {sesion.frecuencia === "diario" ? "Diario" : sesion.frecuencia === "semanal" ? "Semanal" : "Mensual"}
+              {frecuencia === "diario" ? "Diario" : frecuencia === "semanal" ? "Semanal" : "Mensual"}
+            </span>
+          </div>
+
+          {bannerCompartidos.length > 0 && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "flex-start",
+                gap: 10,
+                padding: "12px 16px",
+                background: "#E6F1FB",
+                border: "1px solid #B8D4EF",
+                borderLeft: "4px solid #185FA5",
+                borderRadius: 10,
+                marginBottom: 16,
+              }}
+            >
+              <Info size={16} style={{ color: "#185FA5", flexShrink: 0, marginTop: 2 }} />
+              <div style={{ fontSize: 13, color: "#1A3A5C", lineHeight: 1.6 }}>
+                <strong>Estos productos también están aquí — cuéntalos para ajustar el stock correctamente:</strong>
+                {bannerCompartidos.map((r) => (
+                  <div key={r.item.product_id}>· {r.item.nombre} ({notaProductoTexto(r.nota)})</div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: 12,
+              flexWrap: "wrap",
+              gap: 8,
+            }}
+          >
+            <span
+              style={{
+                fontSize: 13,
+                fontWeight: 700,
+                color: llenos === totalItems ? "#106653" : "#BA3026",
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              {llenos} / {totalItems} productos llenados
             </span>
           </div>
 
@@ -417,8 +692,9 @@ export default function ConteoView({ zonas, onVolverALista }: Props) {
                   </tr>
                 </thead>
                 <tbody>
-                  {computedItems.map((r, i) => {
+                  {computedItemsZonaActual.map((r, i) => {
                     const sem = SEMAFORO[r.semaforoColor];
+                    const notaTexto = notaProductoTexto(r.nota);
                     return (
                       <tr
                         key={r.item.product_id}
@@ -432,6 +708,11 @@ export default function ConteoView({ zonas, onVolverALista }: Props) {
                           <span style={{ display: "block", fontSize: 11, color: "hsl(var(--text-muted))", marginTop: 1 }}>
                             {r.item.unidad}
                           </span>
+                          {notaTexto && (
+                            <span style={{ display: "block", fontSize: 11, color: "hsl(var(--text-sub))", marginTop: 2, fontStyle: "italic" }}>
+                              {notaTexto}
+                            </span>
+                          )}
                         </td>
                         <td style={{ padding: "10px 14px", textAlign: "center" }}>
                           <span style={{ fontSize: 15, fontWeight: 700, fontVariantNumeric: "tabular-nums", color: "hsl(var(--text-main))" }}>
@@ -443,11 +724,11 @@ export default function ConteoView({ zonas, onVolverALista }: Props) {
                             type="number"
                             step="0.1"
                             min="0"
-                            placeholder="—"
+                            placeholder="0 si no hay"
                             disabled={isPendingAplicar}
                             value={r.raw}
                             onChange={(e) =>
-                              setInputs((prev) => ({ ...prev, [r.item.product_id]: e.target.value }))
+                              setInputsZonaActual((prev) => ({ ...prev, [r.item.product_id]: e.target.value }))
                             }
                             style={{
                               width: "100%",
@@ -455,7 +736,7 @@ export default function ConteoView({ zonas, onVolverALista }: Props) {
                               borderRadius: 8,
                               borderWidth: "1.5px",
                               borderStyle: "solid",
-                              borderColor: "hsl(var(--border))",
+                              borderColor: r.fisicaNum === null ? "hsl(var(--border))" : "hsl(var(--border))",
                               backgroundColor: isPendingAplicar ? "hsl(var(--surface-alt))" : "hsl(var(--surface))",
                               color: "hsl(var(--text-main))",
                               fontSize: 14,
@@ -482,7 +763,7 @@ export default function ConteoView({ zonas, onVolverALista }: Props) {
                               }}
                             >
                               {r.diff! >= 0 ? "+" : "−"}
-                              {Math.abs(r.diff!).toFixed(1)} {r.item.unidad}
+                              {fmtQty(Math.abs(r.diff!))} {r.item.unidad}
                             </span>
                           )}
                         </td>
@@ -492,75 +773,125 @@ export default function ConteoView({ zonas, onVolverALista }: Props) {
                 </tbody>
               </table>
             </div>
+          </div>
 
-            {mostrarResumen && (
-              <div style={{ borderTop: "1.5px solid hsl(var(--border))", padding: "16px 20px", background: "hsl(var(--surface-alt))" }}>
-                <h3 style={{ margin: "0 0 10px", fontSize: 14, fontWeight: 700, color: "hsl(var(--text-main))" }}>
-                  Resumen del conteo
-                </h3>
-                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                  {computedItems.map((r) => {
-                    const badge =
-                      r.fisicaNum === null
-                        ? { label: "Sin contar", bg: "hsl(var(--text-muted) / 0.15)", color: "hsl(var(--text-muted))" }
-                        : r.diff! > 0
-                          ? { label: "Entrada", bg: "hsl(var(--green) / 0.15)", color: "hsl(var(--green))" }
-                          : r.diff! < 0
-                            ? { label: "Salida", bg: "hsl(var(--terracota) / 0.15)", color: "hsl(var(--terracota))" }
-                            : { label: "Sin cambio", bg: "hsl(var(--text-muted) / 0.15)", color: "hsl(var(--text-sub))" };
-                    return (
-                      <div
-                        key={r.item.product_id}
-                        style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 0", fontSize: 13 }}
-                      >
-                        <span style={{ color: "hsl(var(--text-main))" }}>{r.item.nombre}</span>
-                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                          <span style={{ color: "hsl(var(--text-sub))", fontVariantNumeric: "tabular-nums" }}>
-                            {r.item.stock_actual} → {r.fisicaNum ?? r.item.stock_actual}
-                          </span>
-                          <span
-                            style={{
-                              padding: "2px 8px",
-                              borderRadius: 99,
-                              fontSize: 11,
-                              fontWeight: 600,
-                              background: badge.bg,
-                              color: badge.color,
-                            }}
-                          >
-                            {badge.label}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-                {resumenPreview.sin_contar > 0 && (
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      padding: "10px 14px",
-                      background: "#FAEEDA",
-                      border: "1px solid #E8C98A",
-                      borderRadius: 8,
-                      marginTop: 12,
-                      fontSize: 13,
-                      color: "#633806",
-                    }}
-                  >
-                    <AlertTriangle size={15} />
-                    {resumenPreview.sin_contar} producto{resumenPreview.sin_contar !== 1 ? "s" : ""} sin contar — quedarán sin ajustar
-                  </div>
-                )}
-              </div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+            {sesion.zonasVisitadas.length === 0 ? (
+              <button
+                onClick={resetTodo}
+                disabled={isPendingAplicar}
+                style={{
+                  padding: "9px 18px",
+                  borderRadius: 8,
+                  border: "1.5px solid hsl(var(--border))",
+                  background: "hsl(var(--surface))",
+                  color: "hsl(var(--text-main))",
+                  fontSize: 14,
+                  fontWeight: 600,
+                  fontFamily: "inherit",
+                  cursor: isPendingAplicar ? "not-allowed" : "pointer",
+                }}
+              >
+                ← Cambiar zona
+              </button>
+            ) : (
+              <span />
             )}
+            <button
+              onClick={handleSiguienteOResumen}
+              disabled={btnPrincipalDisabled}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "10px 22px",
+                borderRadius: 8,
+                border: "none",
+                background: btnPrincipalDisabled ? "hsl(var(--border))" : "hsl(var(--terracota))",
+                color: btnPrincipalDisabled ? "hsl(var(--text-muted))" : "white",
+                fontSize: 14,
+                fontWeight: 700,
+                fontFamily: "inherit",
+                cursor: btnPrincipalDisabled ? "not-allowed" : "pointer",
+              }}
+            >
+              {(isPendingCargando || siguientesZonas === null) && todosLlenos && (
+                <Loader2 size={15} style={{ animation: "spin 0.7s linear infinite" }} />
+              )}
+              {btnPrincipalLabel}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {fase === "resumen" && sesion && resumenFinalPreview && (
+        <div>
+          <h3 style={{ margin: "0 0 2px", fontSize: 16, fontWeight: 700, color: "hsl(var(--text-main))" }}>
+            Resumen del conteo
+          </h3>
+          <p style={{ margin: "0 0 16px", fontSize: 12, color: "hsl(var(--text-muted))" }}>
+            Stock calculado al momento de iniciar el conteo
+          </p>
+
+          <div
+            style={{
+              background: "hsl(var(--surface))",
+              borderRadius: 10,
+              border: "1.5px solid hsl(var(--border))",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+              padding: "16px 20px",
+              marginBottom: 16,
+            }}
+          >
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {resumenFinalPreview.rows.map((r) => {
+                const badge =
+                  r.diff > 0
+                    ? { label: "Entrada", bg: "hsl(var(--green) / 0.15)", color: "hsl(var(--green))" }
+                    : r.diff < 0
+                      ? { label: "Salida", bg: "hsl(var(--terracota) / 0.15)", color: "hsl(var(--terracota))" }
+                      : { label: "Sin cambio", bg: "hsl(var(--text-muted) / 0.15)", color: "hsl(var(--text-sub))" };
+                const diffTexto =
+                  r.diff === 0
+                    ? "sin cambio"
+                    : `${r.diff > 0 ? "+" : "−"}${fmtQty(Math.abs(r.diff))} ${r.diff > 0 ? "entrada" : "salida"}`;
+                const detalle =
+                  r.breakdown.length > 1
+                    ? `${r.breakdown.map((b) => `${b.zonaNombre}: ${fmtQty(b.qty)}`).join(" + ")} = Total: ${fmtQty(r.total)} (sistema: ${fmtQty(r.stock_original)})`
+                    : `${fmtQty(r.total)} ${r.unidad} (sistema: ${fmtQty(r.stock_original)})`;
+                return (
+                  <div
+                    key={r.product_id}
+                    style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "4px 0", fontSize: 13, flexWrap: "wrap" }}
+                  >
+                    <span style={{ color: "hsl(var(--text-main))" }}>
+                      <strong>{r.nombre}</strong> — {detalle} → {diffTexto}
+                    </span>
+                    <span
+                      style={{
+                        padding: "2px 8px",
+                        borderRadius: 99,
+                        fontSize: 11,
+                        fontWeight: 600,
+                        background: badge.bg,
+                        color: badge.color,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {badge.label}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid hsl(var(--border))", fontSize: 13, color: "hsl(var(--text-sub))", fontWeight: 600 }}>
+              {resumenFinalPreview.ajustados} productos ajustados · {resumenFinalPreview.entradas} entradas · {resumenFinalPreview.salidas} salidas · {resumenFinalPreview.sin_cambio} sin cambio
+            </div>
           </div>
 
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
             <button
-              onClick={resetAPaso1}
+              onClick={() => setFase("conteo")}
               disabled={isPendingAplicar}
               style={{
                 padding: "9px 18px",
@@ -574,11 +905,11 @@ export default function ConteoView({ zonas, onVolverALista }: Props) {
                 cursor: isPendingAplicar ? "not-allowed" : "pointer",
               }}
             >
-              ← Cambiar zona
+              ← Revisar conteo
             </button>
             <button
-              onClick={handleBotonPrincipal}
-              disabled={btnAplicarDisabled}
+              onClick={handleAplicarAjustes}
+              disabled={isPendingAplicar}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -586,20 +917,16 @@ export default function ConteoView({ zonas, onVolverALista }: Props) {
                 padding: "10px 22px",
                 borderRadius: 8,
                 border: "none",
-                background: btnAplicarDisabled
-                  ? "hsl(var(--border))"
-                  : mostrarResumen
-                    ? "#106653"
-                    : "hsl(var(--terracota))",
-                color: btnAplicarDisabled ? "hsl(var(--text-muted))" : "white",
+                background: isPendingAplicar ? "hsl(var(--border))" : "#106653",
+                color: isPendingAplicar ? "hsl(var(--text-muted))" : "white",
                 fontSize: 14,
                 fontWeight: 700,
                 fontFamily: "inherit",
-                cursor: btnAplicarDisabled ? "not-allowed" : "pointer",
+                cursor: isPendingAplicar ? "not-allowed" : "pointer",
               }}
             >
               {isPendingAplicar && <Loader2 size={15} style={{ animation: "spin 0.7s linear infinite" }} />}
-              {isPendingAplicar ? "Aplicando..." : mostrarResumen ? "✓ Aplicar ajustes" : "Ver resumen"}
+              {isPendingAplicar ? "Aplicando..." : "✓ Aplicar ajustes"}
             </button>
           </div>
         </div>
@@ -656,12 +983,11 @@ export default function ConteoView({ zonas, onVolverALista }: Props) {
               <ResumenRow label="Ajustes aplicados" value={resumenFinal.ajustados} />
               <ResumenRow label="Entradas" value={resumenFinal.entradas} />
               <ResumenRow label="Salidas" value={resumenFinal.salidas} />
-              <ResumenRow label="Sin cambio" value={resumenFinal.sin_cambio} />
-              <ResumenRow label="Sin contar" value={resumenFinal.sin_contar} last />
+              <ResumenRow label="Sin cambio" value={resumenFinal.sin_cambio} last />
             </div>
 
             <button
-              onClick={resetAPaso1}
+              onClick={resetTodo}
               style={{
                 width: "100%",
                 padding: "11px 0",
@@ -678,6 +1004,64 @@ export default function ConteoView({ zonas, onVolverALista }: Props) {
               Hacer otro conteo
             </button>
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ZonaBreadcrumb({
+  completadas,
+  zonaActualId,
+  siguiente,
+}: {
+  completadas: ZonaVisitada[];
+  zonaActualId: string | null;
+  siguiente: ZonaPendiente | null;
+}) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 20 }}>
+      {completadas.map((z, i) => {
+        const esActual = z.zonaId === zonaActualId;
+        return (
+          <div key={z.zonaId} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            {i > 0 && <span style={{ color: "hsl(var(--text-muted))", fontSize: 12 }}>→</span>}
+            <span
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 5,
+                padding: "4px 10px",
+                borderRadius: 99,
+                fontSize: 12,
+                fontWeight: 700,
+                background: esActual ? "hsl(var(--terracota) / 0.10)" : "hsl(var(--green) / 0.12)",
+                color: esActual ? "hsl(var(--terracota))" : "hsl(var(--green))",
+                border: esActual ? "1.5px solid hsl(var(--terracota))" : "none",
+              }}
+            >
+              {!esActual && <Check size={11} />}
+              {z.zonaNombre}
+              {esActual && " ← estás aquí"}
+            </span>
+          </div>
+        );
+      })}
+      {siguiente && (
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ color: "hsl(var(--text-muted))", fontSize: 12 }}>→</span>
+          <span
+            style={{
+              padding: "4px 10px",
+              borderRadius: 99,
+              fontSize: 12,
+              fontWeight: 600,
+              background: "hsl(var(--surface-alt))",
+              color: "hsl(var(--text-muted))",
+            }}
+          >
+            {siguiente.nombre}
+          </span>
         </div>
       )}
     </div>

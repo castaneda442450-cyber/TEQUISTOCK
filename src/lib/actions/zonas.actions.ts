@@ -5,9 +5,9 @@ import { requireAuth } from "@/lib/actions/auth.actions";
 import { checkRateLimit } from "@/lib/ratelimit";
 import {
   zonaSchema,
-  conteoZonaSchema,
+  conteoMultiZonaSchema,
   type ZonaInput,
-  type ConteoZonaInput,
+  type ConteoMultiZonaInput,
 } from "@/lib/schemas/zona.schema";
 import { revalidatePath } from "next/cache";
 import type { Zona, ConteoZonaItem, ConteoResumen, Producto } from "@/types";
@@ -175,8 +175,8 @@ export async function asignarProductos(
   return { error: null };
 }
 
-export async function procesarConteo(
-  input: ConteoZonaInput,
+export async function procesarConteoMultiZona(
+  input: ConteoMultiZonaInput,
 ): Promise<{ error: string | null; resumen?: ConteoResumen }> {
   const auth = await requireAuth();
   if (auth.error) return { error: auth.error };
@@ -184,23 +184,24 @@ export async function procesarConteo(
   const rl = await checkRateLimit(`conteo:${auth.userId}`);
   if (!rl.success) return { error: "Demasiadas operaciones. Intenta en unos minutos." };
 
-  const parsed = conteoZonaSchema.safeParse(input);
+  const parsed = conteoMultiZonaSchema.safeParse(input);
   if (!parsed.success) return { error: "Datos inválidos" };
 
   const supabase = await createServerClient();
-  const { items, total_productos } = parsed.data;
+  const { frecuencia, totales } = parsed.data;
 
   // Orden determinístico de product_id para que los FOR UPDATE dentro del
   // RPC se adquieran siempre en el mismo orden entre llamadas concurrentes
   // y así se prevengan deadlocks.
-  const sortedItems = [...items].sort((a, b) => a.product_id.localeCompare(b.product_id));
+  const sortedTotales = [...totales].sort((a, b) => a.product_id.localeCompare(b.product_id));
 
-  const { data: rpcData, error: rpcErr } = await supabase.rpc("procesar_conteo_zona", {
-    p_items: sortedItems.map((i) => ({
-      product_id: i.product_id,
-      cantidad_contada: i.cantidad_contada,
+  const { data: rpcData, error: rpcErr } = await supabase.rpc("procesar_conteo_multizona", {
+    p_totales: sortedTotales.map((t) => ({
+      product_id: t.product_id,
+      total_fisico: t.total_fisico,
     })),
     p_user_id: auth.userId,
+    p_frecuencia: frecuencia,
   });
 
   if (rpcErr) return { error: rpcErr.message };
@@ -208,7 +209,6 @@ export async function procesarConteo(
   const entradas = rpcData?.entradas ?? 0;
   const salidas = rpcData?.salidas ?? 0;
   const sin_cambio = rpcData?.sin_cambio ?? 0;
-  const sin_contar = Math.max(0, total_productos - items.length);
 
   revalidatePath("/conteo");
   revalidatePath("/productos");
@@ -217,12 +217,29 @@ export async function procesarConteo(
 
   return {
     error: null,
-    resumen: {
-      ajustados: entradas + salidas,
-      entradas,
-      salidas,
-      sin_cambio,
-      sin_contar,
-    },
+    resumen: { ajustados: entradas + salidas, entradas, salidas, sin_cambio },
   };
+}
+
+export async function getZonasPendientes(
+  productIds: string[],
+  frecuencia: "diario" | "semanal" | "mensual",
+  zonasExcluidas: string[],
+): Promise<{
+  data: Array<{ id: string; nombre: string; color: string; icono: string }> | null;
+  error: string | null;
+}> {
+  const auth = await requireAuth();
+  if (auth.error) return { data: null, error: auth.error };
+  if (productIds.length === 0) return { data: [], error: null };
+  const supabase = await createServerClient();
+
+  const { data, error } = await supabase.rpc("get_zonas_pendientes", {
+    p_product_ids: productIds,
+    p_frecuencia: frecuencia,
+    p_zonas_excluidas: zonasExcluidas,
+  });
+
+  if (error) return { data: null, error: error.message };
+  return { data: data ?? [], error: null };
 }
