@@ -1,18 +1,19 @@
 "use client";
 
-import { useTransition, useEffect } from "react";
+import { useTransition, useEffect, useState } from "react";
 import { useIsTablet } from "@/hooks/useIsTablet";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { sileo } from "sileo";
 import { X, Check, Loader2, Sun, CalendarDays, CalendarCheck } from "lucide-react";
-import { productoSchema, type ProductoInput } from "@/lib/schemas/producto.schema";
+import { productoFormSchema, type ProductoFormValues, type ProductoInput } from "@/lib/schemas/producto.schema";
 import {
   createProducto,
   updateProducto,
+  getProveedoresDeProducto,
 } from "@/lib/actions/productos.actions";
 import { UNIDADES } from "@/lib/constants";
-import type { Producto, Categoria } from "@/types";
+import type { Producto, Categoria, Proveedor } from "@/types";
 
 const FREQ_MODAL_CONFIG = {
   diario:  { color: "#791F1F", bg: "#FCEBEB" },
@@ -45,6 +46,7 @@ interface ProductoModalProps {
   open: boolean;
   editTarget: Producto | null;
   categorias: Categoria[];
+  proveedores: Proveedor[];
   onClose: () => void;
   onSuccess: (p: Producto) => void;
 }
@@ -53,10 +55,12 @@ export function ProductoModal({
   open,
   editTarget,
   categorias,
+  proveedores,
   onClose,
   onSuccess,
 }: ProductoModalProps) {
   const [isPending, startTransition] = useTransition();
+  const [selectedSupplierIds, setSelectedSupplierIds] = useState<string[]>([]);
   const isTablet = useIsTablet();
 
   const {
@@ -66,8 +70,8 @@ export function ProductoModal({
     watch,
     setValue,
     formState: { errors },
-  } = useForm<ProductoInput>({
-    resolver: zodResolver(productoSchema),
+  } = useForm<ProductoFormValues>({
+    resolver: zodResolver(productoFormSchema),
     defaultValues: {
       nombre: "",
       categoria_id: categorias[0]?.id ?? "",
@@ -75,6 +79,7 @@ export function ProductoModal({
       stock_minimo: 5,
       last_price: 0,
       frecuencia_conteo: "semanal",
+      supplier_ids: [],
     },
   });
 
@@ -89,6 +94,11 @@ export function ProductoModal({
         stock_minimo: editTarget.stock_minimo,
         last_price: editTarget.last_price,
         frecuencia_conteo: editTarget.frecuencia_conteo ?? "semanal",
+        supplier_ids: [],
+      });
+      setSelectedSupplierIds([]);
+      getProveedoresDeProducto(editTarget.id).then((res) => {
+        setSelectedSupplierIds(res.data);
       });
     } else {
       reset({
@@ -98,20 +108,29 @@ export function ProductoModal({
         stock_minimo: 5,
         last_price: 0,
         frecuencia_conteo: "semanal",
+        supplier_ids: [],
       });
+      setSelectedSupplierIds([]);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, editTarget]);
 
-  function onSubmit(data: ProductoInput) {
+  function toggleSupplier(id: string) {
+    setSelectedSupplierIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  }
+
+  function onSubmit(data: ProductoFormValues) {
+    const payload: ProductoInput = { ...data, supplier_ids: selectedSupplierIds };
     startTransition(async () => {
       if (editTarget) {
-        const res = await updateProducto(editTarget.id, data);
+        const res = await updateProducto(editTarget.id, payload);
         if (res.error) { sileo.error({ title: res.error, description: "Por favor intenta nuevamente." }); return; }
         sileo.success({ title: "Producto actualizado", description: "Los cambios se guardaron correctamente." });
         onSuccess(res.data!);
       } else {
-        const res = await createProducto(data);
+        const res = await createProducto(payload);
         if (res.error) { sileo.error({ title: res.error, description: "Por favor intenta nuevamente." }); return; }
         sileo.success({ title: "Producto creado", description: "El producto se agregó al inventario." });
         onSuccess(res.data!);
@@ -286,6 +305,66 @@ export function ProductoModal({
                     </button>
                   );
                 })}
+              </div>
+            </div>
+
+            {/* Proveedores */}
+            <div>
+              <label style={labelStyle}>Proveedores que surten este producto</label>
+              <p style={{ fontSize: 11, color: "hsl(var(--text-muted))", margin: "0 0 8px" }}>
+                Opcional — puedes asignarlo después
+              </p>
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: 6,
+                  maxHeight: 140,
+                  overflowY: "auto",
+                  padding: "8px 0",
+                  minHeight: 40,
+                }}
+              >
+                {proveedores.length === 0 ? (
+                  <span style={{ fontSize: 12, color: "hsl(var(--text-muted))" }}>
+                    No hay proveedores registrados
+                  </span>
+                ) : (
+                  proveedores.map((prov) => {
+                    const selected = selectedSupplierIds.includes(prov.id);
+                    return (
+                      <button
+                        key={prov.id}
+                        type="button"
+                        onClick={() => toggleSupplier(prov.id)}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 5,
+                          padding: "5px 12px",
+                          borderRadius: 20,
+                          fontSize: 12,
+                          fontWeight: selected ? 600 : 400,
+                          cursor: "pointer",
+                          border: selected
+                            ? "1.5px solid hsl(var(--green))"
+                            : "1.5px solid hsl(var(--border))",
+                          backgroundColor: selected
+                            ? "hsl(var(--green) / 0.15)"
+                            : "transparent",
+                          color: selected
+                            ? "hsl(var(--green))"
+                            : "hsl(var(--text-sub))",
+                          fontFamily: "inherit",
+                          transition: "all 0.12s ease",
+                        }}
+                      >
+                        {selected && <Check size={12} />}
+                        {prov.company}
+                      </button>
+                    );
+                  })
+                )}
               </div>
             </div>
           </div>

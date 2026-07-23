@@ -21,6 +21,13 @@ const CYCLE: Record<string, "diario" | "semanal" | "mensual"> = {
   diario: "semanal", semanal: "mensual", mensual: "diario",
 };
 
+function proveedoresLabel(proveedores?: { id: string; company: string }[]): string {
+  if (!proveedores || proveedores.length === 0) return "Sin proveedor asignado";
+  if (proveedores.length === 1) return proveedores[0].company;
+  if (proveedores.length === 2) return `${proveedores[0].company} · ${proveedores[1].company}`;
+  return `${proveedores[0].company} +${proveedores.length - 1} más`;
+}
+
 interface ProductosTableProps {
   productos: Producto[];
   categorias: Categoria[];
@@ -66,6 +73,9 @@ export function ProductosTable({ productos, categorias, onEdit, onDelete, onFrec
                   {p.nombre}
                 </div>
                 <div style={{ fontSize: 11, color: "hsl(var(--text-muted))" }}>{p.unidad}</div>
+                <div style={{ fontSize: 11, color: "hsl(var(--text-muted))", marginTop: 2 }}>
+                  {proveedoresLabel(p.proveedores)}
+                </div>
               </div>
             </div>
           );

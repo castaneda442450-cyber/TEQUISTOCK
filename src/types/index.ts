@@ -21,6 +21,7 @@ export interface Producto {
   frecuencia_conteo: 'diario' | 'semanal' | 'mensual';
   created_at: string;
   categoria?: Categoria;
+  proveedores?: { id: string; company: string }[];
 }
 
 export interface Proveedor {

@@ -6,7 +6,7 @@ import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { sileo } from "sileo";
 import { Plus, Search, X } from "lucide-react";
 import { deleteProducto, quickUpdateFrecuencia } from "@/lib/actions/productos.actions";
-import type { Producto, Categoria } from "@/types";
+import type { Producto, Categoria, Proveedor } from "@/types";
 import { ProductosTable } from "@/components/productos/ProductosTable";
 import { Pagination } from "@/components/productos/Pagination";
 import { EmptyState } from "@/components/productos/EmptyState";
@@ -20,6 +20,7 @@ interface Props {
   totalPages: number;
   currentPage: number;
   categorias: Categoria[];
+  proveedores: Proveedor[];
   initialSearch: string;
   initialCategoria: string;
   initialFrecuencia: string;
@@ -31,6 +32,7 @@ export default function ProductosClient({
   totalPages,
   currentPage,
   categorias: initialCategorias,
+  proveedores,
   initialSearch,
   initialCategoria,
   initialFrecuencia,
@@ -315,6 +317,7 @@ export default function ProductosClient({
         open={showModal}
         editTarget={editTarget}
         categorias={categorias}
+        proveedores={proveedores}
         onClose={() => setShowModal(false)}
         onSuccess={() => {
           setShowModal(false);

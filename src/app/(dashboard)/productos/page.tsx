@@ -1,4 +1,5 @@
 import { getProductos, getCategorias } from "@/lib/actions/productos.actions";
+import { getProveedores } from "@/lib/actions/proveedores.actions";
 import ProductosClient from "./ProductosClient";
 
 interface ProductosPageProps {
@@ -14,7 +15,7 @@ export default async function ProductosPage({ searchParams }: ProductosPageProps
   const params = await searchParams;
   const page = Number(params.page) > 0 ? Number(params.page) : 1;
 
-  const [productosResult, { data: categorias }] = await Promise.all([
+  const [productosResult, { data: categorias }, { data: proveedores }] = await Promise.all([
     getProductos({
       search: params.search,
       categoriaId: params.categoria,
@@ -22,6 +23,7 @@ export default async function ProductosPage({ searchParams }: ProductosPageProps
       page,
     }),
     getCategorias(),
+    getProveedores(),
   ]);
 
   return (
@@ -31,6 +33,7 @@ export default async function ProductosPage({ searchParams }: ProductosPageProps
       totalPages={productosResult.totalPages}
       currentPage={productosResult.page}
       categorias={categorias ?? []}
+      proveedores={proveedores ?? []}
       initialSearch={params.search ?? ""}
       initialCategoria={params.categoria ?? ""}
       initialFrecuencia={params.frecuencia ?? ""}

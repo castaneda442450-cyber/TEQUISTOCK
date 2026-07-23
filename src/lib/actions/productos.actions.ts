@@ -13,6 +13,16 @@ function escapeLike(input: string): string {
   return input.replace(/[\\%_]/g, (m) => `\\${m}`);
 }
 
+function mapProductoRow(row: any): Producto {
+  const { proveedor_productos, ...rest } = row;
+  return {
+    ...rest,
+    proveedores: (proveedor_productos ?? [])
+      .map((pp: any) => pp.proveedores)
+      .filter(Boolean),
+  } as Producto;
+}
+
 export interface GetProductosParams {
   search?: string;
   categoriaId?: string;
@@ -41,7 +51,10 @@ export async function getProductos(
 
   let query = supabase
     .from("productos")
-    .select("*, categorias:categoria_id(id,nombre,color)", { count: "exact" });
+    .select(
+      "*, categorias:categoria_id(id,nombre,color), proveedor_productos(proveedores(id,company))",
+      { count: "exact" },
+    );
 
   if (params.search && params.search.trim()) {
     const term = escapeLike(params.search.trim());
@@ -64,7 +77,7 @@ export async function getProductos(
 
   const total = count ?? 0;
   return {
-    data: (data ?? []) as unknown as Producto[],
+    data: (data ?? []).map(mapProductoRow),
     count: total,
     totalPages: Math.max(1, Math.ceil(total / PER_PAGE)),
     page,
@@ -78,10 +91,10 @@ export async function getAllProductos(): Promise<{ data: Producto[]; error: stri
   const supabase = await createServerClient();
   const { data, error } = await supabase
     .from("productos")
-    .select("*, categorias:categoria_id(id,nombre,color)")
+    .select("*, categorias:categoria_id(id,nombre,color), proveedor_productos(proveedores(id,company))")
     .order("nombre");
   if (error) return { data: [], error: error.message };
-  return { data: (data ?? []) as unknown as Producto[], error: null };
+  return { data: (data ?? []).map(mapProductoRow), error: null };
 }
 
 export async function getProductoById(
@@ -115,12 +128,20 @@ export async function createProducto(
   if (count && count > 0)
     return { data: null, error: `Ya existe un producto con el nombre "${parsed.data.nombre}"` };
 
+  const { supplier_ids, ...productoFields } = parsed.data;
+
   const { data, error } = await supabase
     .from("productos")
-    .insert({ ...parsed.data, stock_actual: 0 })
+    .insert({ ...productoFields, stock_actual: 0 })
     .select("*, categorias:categoria_id(id,nombre,color)")
     .single();
   if (error) return { data: null, error: error.message };
+
+  if (supplier_ids.length > 0) {
+    await supabase
+      .from("proveedor_productos")
+      .insert(supplier_ids.map((sid) => ({ supplier_id: sid, product_id: data.id })));
+  }
 
   revalidatePath("/productos");
   revalidatePath("/dashboard");
@@ -137,17 +158,45 @@ export async function updateProducto(
   if (!parsed.success) return { data: null, error: "Datos inválidos" };
   const supabase = await createServerClient();
 
+  const { supplier_ids, ...productoFields } = parsed.data;
+
   const { data, error } = await supabase
     .from("productos")
-    .update(parsed.data)
+    .update(productoFields)
     .eq("id", id)
     .select("*, categorias:categoria_id(id,nombre,color)")
     .single();
   if (error) return { data: null, error: error.message };
 
+  // Sync supplier links: delete old, insert new
+  await supabase.from("proveedor_productos").delete().eq("product_id", id);
+  // NOTA: si el INSERT falla aquí, el producto queda sin
+  // proveedores asignados temporalmente. El usuario puede
+  // volver a editar para reasignar. No es crítico porque
+  // proveedor_productos no afecta el stock ni los movimientos.
+  if (supplier_ids.length > 0) {
+    await supabase
+      .from("proveedor_productos")
+      .insert(supplier_ids.map((sid) => ({ supplier_id: sid, product_id: id })));
+  }
+
   revalidatePath("/productos");
   revalidatePath("/dashboard");
   return { data: data as unknown as Producto, error: null };
+}
+
+export async function getProveedoresDeProducto(
+  product_id: string,
+): Promise<{ data: string[]; error: string | null }> {
+  const auth = await requireAuth();
+  if (auth.error) return { data: [], error: auth.error };
+  const supabase = await createServerClient();
+  const { data, error } = await supabase
+    .from("proveedor_productos")
+    .select("supplier_id")
+    .eq("product_id", product_id);
+  if (error) return { data: [], error: error.message };
+  return { data: (data ?? []).map((r: any) => r.supplier_id as string), error: null };
 }
 
 export async function deleteProducto(
