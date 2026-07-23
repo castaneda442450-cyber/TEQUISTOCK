@@ -631,3 +631,110 @@ AS $$
      AND z.activo = true
    ORDER BY z.nombre;
 $$;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- MIGRACIÓN — Porcionado
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- TABLA: porcion_config
+-- Define qué productos se porcionan y su tamaño estándar de porción.
+-- porcion_unit debe ser compatible (misma familia de unidades) con la unidad
+-- del producto — la validación se hace en el server action con units.ts.
+CREATE TABLE IF NOT EXISTS public.porcion_config (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  product_id uuid NOT NULL UNIQUE REFERENCES public.productos(id) ON DELETE CASCADE,
+  porcion_size numeric(10,3) NOT NULL,
+  porcion_unit text NOT NULL,
+  min_porciones int NOT NULL DEFAULT 0,
+  -- umbral (%) de merma que dispara la alerta/confirmación en la UI, por producto
+  merma_alerta_pct numeric(5,2) NOT NULL DEFAULT 15,
+  activo boolean NOT NULL DEFAULT true,
+  created_at timestamp DEFAULT now()
+);
+ALTER TABLE public.porcion_config ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "porcion_config_all" ON public.porcion_config
+  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- TABLA: porcionados
+-- Registra cada evento de porcionado. Sin historial en la UI (solo agregación
+-- del día), pero es log persistente.
+CREATE TABLE IF NOT EXISTS public.porcionados (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  product_id uuid NOT NULL REFERENCES public.productos(id) ON DELETE RESTRICT,
+  -- Cantidad de producto usada (en la unidad ingresada por el usuario)
+  cantidad_usada numeric(10,3) NOT NULL,
+  unidad_usada text NOT NULL,
+  -- Porciones obtenidas
+  porciones_obtenidas int NOT NULL,
+  -- Tamaño real de cada porción (puede diferir del estándar configurado)
+  porcion_size_real numeric(10,3) NOT NULL,
+  porcion_unit text NOT NULL,
+  -- Merma calculada (en unidad del producto)
+  merma_cantidad numeric(10,3) NOT NULL DEFAULT 0,
+  merma_unidad text NOT NULL,
+  -- Quién y cuándo
+  user_id uuid NOT NULL,
+  fecha date NOT NULL DEFAULT CURRENT_DATE,
+  notas text,
+  created_at timestamp DEFAULT now()
+);
+ALTER TABLE public.porcionados ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "porcionados_all" ON public.porcionados
+  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+CREATE INDEX IF NOT EXISTS idx_porcionados_product_fecha
+  ON public.porcionados(product_id, fecha);
+
+-- FUNCIÓN RPC: registrar_porcionado
+-- Escritura atómica en dos tablas (porcionados + movimientos). El movimiento
+-- 'salida' descuenta stock vía el trigger actualizar_stock(); si el trigger
+-- lanza P0001 (stock insuficiente), TODO el bloque revierte, incluido el
+-- insert en porcionados.
+--
+-- Toda la conversión de unidades y el cálculo de merma se hacen en TypeScript
+-- (units.ts) — esta función solo persiste los valores ya calculados.
+-- p_qty_movimiento ya viene convertido a la unidad del producto y redondeado
+-- a entero (movimientos.qty es integer).
+CREATE OR REPLACE FUNCTION public.registrar_porcionado(
+  p_product_id         uuid,
+  p_cantidad_usada     numeric,
+  p_unidad_usada       text,
+  p_porciones_obtenidas int,
+  p_porcion_size_real  numeric,
+  p_porcion_unit       text,
+  p_merma_cantidad     numeric,
+  p_merma_unidad       text,
+  p_qty_movimiento     int,
+  p_user_id            uuid,
+  p_notas              text
+)
+RETURNS public.porcionados
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_row public.porcionados;
+BEGIN
+  INSERT INTO public.porcionados (
+    product_id, cantidad_usada, unidad_usada, porciones_obtenidas,
+    porcion_size_real, porcion_unit, merma_cantidad, merma_unidad,
+    user_id, notas
+  )
+  VALUES (
+    p_product_id, p_cantidad_usada, p_unidad_usada, p_porciones_obtenidas,
+    p_porcion_size_real, p_porcion_unit, p_merma_cantidad, p_merma_unidad,
+    p_user_id, p_notas
+  )
+  RETURNING * INTO v_row;
+
+  INSERT INTO public.movimientos (product_id, tipo, qty, user_id, notes)
+  VALUES (
+    p_product_id, 'salida', p_qty_movimiento, p_user_id,
+    'Porcionado — ' || p_porciones_obtenidas || ' porciones de ' ||
+    p_porcion_size_real || p_porcion_unit
+  );
+
+  RETURN v_row;
+END;
+$$;

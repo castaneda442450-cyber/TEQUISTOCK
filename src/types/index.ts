@@ -209,3 +209,48 @@ export interface ConteoResumen {
   salidas: number;
   sin_cambio: number;
 }
+
+// ─── Porcionado ────────────────────────────────────────────────────────────────
+
+export interface PorcionConfig {
+  id: string;
+  product_id: string;
+  porcion_size: number;
+  porcion_unit: string;
+  min_porciones: number;
+  merma_alerta_pct: number;
+  activo: boolean;
+  created_at: string;
+  producto?: Producto;
+}
+
+export interface Porcionado {
+  id: string;
+  product_id: string;
+  cantidad_usada: number;
+  unidad_usada: string;
+  porciones_obtenidas: number;
+  porcion_size_real: number;
+  porcion_unit: string;
+  merma_cantidad: number;
+  merma_unidad: string;
+  user_id: string;
+  fecha: string;
+  notas: string | null;
+  created_at: string;
+  producto?: Producto;
+}
+
+export interface ResumenPorcion {
+  product_id: string;
+  nombre: string;
+  unidad_producto: string;
+  stock_actual: number;
+  stock_actual_display: number;
+  porcion_config: PorcionConfig | null;
+  porciones_porcionadas_hoy: number;
+  porciones_posibles_con_stock: number;
+  merma_hoy: number;
+  merma_unidad: string;
+  estado: "ok" | "bajo" | "sin_porcionar" | "sin_config";
+}

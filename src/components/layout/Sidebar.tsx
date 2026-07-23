@@ -9,6 +9,7 @@ import {
   Package,
   Truck,
   ShoppingCart,
+  Scissors,
   ScanBarcode,
   ArrowRightFromLine,
   BookOpen,
@@ -51,6 +52,7 @@ const NAV_SECTIONS: NavSection[] = [
   {
     label: "CONTROL DIARIO",
     items: [
+      { href: "/porcionado", label: "Porcionado", icon: Scissors },
       { href: "/conteo", label: "Conteo por zonas", icon: ScanBarcode },
     ],
   },
